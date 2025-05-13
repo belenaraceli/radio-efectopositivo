@@ -1,0 +1,17 @@
+* {
+	background-color: black;
+}
+
+img {
+	padding: 100px;
+	max-width: 700px;
+	max-height: 500px;
+}
+
+.audio {
+	display: flex;
+	flex-direction: row;
+	width: 700px;
+	height: 200px;
+
+}
