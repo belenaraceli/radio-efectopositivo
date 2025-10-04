@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Galería | Radio Efecto Positivo</title>
+
+  <meta property="og:url" content="https://radioefectopositivo.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Galería - Radio Efecto Positivo" />
+  <meta property="og:description" content="Reviví nuestros eventos pasados." />
+  <meta property="og:image" content="https://radioefectopositivo.com/logo.jpg" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/normalize.css" />
+  <link rel="shortcut icon" href="../assets/images/icon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+
+</head>
+
+<body>
+
+  <!-- HEADER MOBILE -->
+  <header class="header-mobile d-block d-lg-none">
+    <div class="top-bar-mobile">
+      <div class="top-container">
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasMenu" aria-controls="offcanvasMenu">
+          <div class="toggler-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </button>
+        <img src="../assets/images/logo-mobile.png" alt="Logo Radio Efecto Positivo" class="logo-mobile">
+      </div>
+    </div>
+
+    <div class="navbar-mobile">
+      <div class="social-icons">
+        <a href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"><img src="../assets/images/whatsapp.png" alt="WhatsApp"></a>
+        <a href="https://www.instagram.com/efectopositivoradio/" target="_blank"><img src="../assets/images/instagram.png" alt="Instagram"></a>
+        <a href="https://www.youtube.com/@radioefectopositivo" target="_blank"><img src="../assets/images/youtube.png" alt="YouTube"></a>
+        <a href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"><img src="../assets/images/facebook.png" alt="Facebook"></a>
+      </div>
+      <div class="vivo">
+        <div class="parpadea circulo"></div>
+        <a class="radio" onclick="vivo()"> Radio en vivo</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MENÚ MOBILE -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasMenu" aria-labelledby="offcanvasMenuLabel">
+    <div class="offcanvas-header">
+      <button type="button" class="btn-close close-red ms-auto" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column align-items-center justify-content-center text-center">
+      <a class="nav-link" href="../index.html">Inicio</a>
+      <a class="nav-link" href="programacion.html">Programación</a>
+      <a class="nav-link" href="ondemand.html">On Demand</a>
+      <a class="nav-link" href="galeria.html">Galería</a>
+      <a class="nav-link" href="contacto.html">Contacto</a>
+    </div>
+  </div>
+
+  <!-- CONTENIDO GENERAL -->
+  <div class="content">
+
+    <!-- HEADER DESKTOP -->
+    <div class="header d-none d-lg-flex">
+      <div class="rss">
+        <a href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"><img src="../assets/images/whatsapp.png" alt="WhatsApp"></a>
+        <a href="https://www.instagram.com/efectopositivoradio/" target="_blank"><img src="../assets/images/instagram.png" alt="Instagram"></a>
+        <a href="https://www.youtube.com/@radioefectopositivo" target="_blank"><img src="../assets/images/youtube.png" alt="YouTube"></a>
+        <a href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"><img src="../assets/images/facebook.png" alt="Facebook"></a>
+      </div>
+
+      <div class="logo">
+        <a href="../index.html"><img src="../assets/images/logo.png" alt="Logo" /></a>
+      </div>
+
+      <div class="vivo">
+        <div class="parpadea circulo"></div>
+        <a class="radio" onclick="vivo()"> Radio en vivo</a>
+      </div>
+    </div>
+
+    <!-- NAVBAR DESKTOP -->
+    <nav class="navbar navbar-expand-lg custom-navbar d-none d-lg-block w-100">
+      <div class="container-fluid justify-content-center">
+        <div class="collapse navbar-collapse justify-content-center" id="navbarMenu">
+          <ul class="navbar-nav text-uppercase">
+            <li class="nav-item"><a class="nav-link" href="../index.html">Inicio</a></li>
+            <li class="nav-item"><a class="nav-link" href="programacion.html">Programación</a></li>
+            <li class="nav-item"><a class="nav-link" href="ondemand.html">On Demand</a></li>
+            <li class="nav-item"><a class="nav-link" href="galeria.html">Galería</a></li>
+            <li class="nav-item"><a class="nav-link" href="contacto.html">Contacto</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- MAIN GALERÍA -->
+    <main class="main-galeria">
+
+      <div class="enconstruccion"><img src="../assets/images/enconstruccion.png" alt=""></div>
+
+
+      <!-- <h1>Un repaso por nuestros encuentros, eventos y transmisiones</h1>
+
+
+<div class="galeria-grid">
+  <a href="../assets/images/1.jpg" class="glightbox"><img src="../assets/images/1.jpg" alt="Foto 1"></a>
+  <a href="../assets/images/2.jpg" class="glightbox"><img src="../assets/images/2.jpg" alt="Foto 2"></a>
+  <a href="../assets/images/5.jpg" class="glightbox"><img src="../assets/images/5.jpg" alt="Foto 5"></a>
+  <a href="../assets/images/6.jpg" class="glightbox"><img src="../assets/images/6.jpg" alt="Foto 6"></a>
+  <a href="../assets/images/7.jpg" class="glightbox"><img src="../assets/images/7.jpg" alt="Foto 7"></a>
+  <a href="../assets/images/8.jpg" class="glightbox"><img src="../assets/images/8.jpg" alt="Foto 8"></a>
+
+  
+  <a href="../assets/images/9.jpg" class="glightbox hidden-img"><img src="../assets/images/9.jpg" alt="Foto 9"></a>
+  <a href="../assets/images/10.jpg" class="glightbox hidden-img"><img src="../assets/images/10.jpg" alt="Foto 10"></a>
+  <a href="../assets/images/11.jpg" class="glightbox hidden-img"><img src="../assets/images/11.jpg" alt="Foto 11"></a>
+  <a href="../assets/images/12.jpg" class="glightbox hidden-img"><img src="../assets/images/12.jpg" alt="Foto 12"></a>
+  <a href="../assets/images/13.jpg" class="glightbox hidden-img"><img src="../assets/images/13.jpg" alt="Foto 13"></a>
+  <a href="../assets/images/14.jpg" class="glightbox hidden-img"><img src="../assets/images/14.jpg" alt="Foto 14"></a>
+  <a href="../assets/images/15.jpg" class="glightbox hidden-img"><img src="../assets/images/15.jpg" alt="Foto 15"></a>
+  <a href="../assets/images/16.jpg" class="glightbox hidden-img"><img src="../assets/images/16.jpg" alt="Foto 16"></a>
+  <a href="../assets/images/17.jpg" class="glightbox hidden-img"><img src="../assets/images/17.jpg" alt="Foto 17"></a>
+  <a href="../assets/images/18.jpg" class="glightbox hidden-img"><img src="../assets/images/18.jpg" alt="Foto 18"></a>
+  <a href="../assets/images/19.jpg" class="glightbox hidden-img"><img src="../assets/images/19.jpg" alt="Foto 19"></a>
+  <a href="../assets/images/20.jpg" class="glightbox hidden-img"><img src="../assets/images/20.jpg" alt="Foto 20"></a>
+  <a href="../assets/images/21.jpg" class="glightbox hidden-img"><img src="../assets/images/21.jpg" alt="Foto 21"></a>
+  <a href="../assets/images/22.jpg" class="glightbox hidden-img"><img src="../assets/images/22.jpg" alt="Foto 22"></a>
+  <a href="../assets/images/23.jpg" class="glightbox hidden-img"><img src="../assets/images/23.jpg" alt="Foto 23"></a>
+  <a href="../assets/images/24.jpg" class="glightbox hidden-img"><img src="../assets/images/24.jpg" alt="Foto 24"></a>
+</div>
+
+
+<div class="ver-mas-container">
+  <button id="verMasBtn">Ver más</button>
+</div>  -->
+
+    </main>
+
+    <!-- FOOTER -->
+   <footer class="footer">
+  <img src="../assets/images/logo.jpg" alt="Logo" class="footer-logo" />
+
+  <div class="footer-nav">
+    <a href="index.html">Inicio</a>
+    <a href="programacion.html">Programación</a>
+    <a href="videos.html">Videos</a>
+    <a href="galeria.html">Galería</a>
+    <a href="contacto.html">Contacto</a>
+  </div>
+
+  <div class="footer-social">
+    <a href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"><img src="../assets/images/whatsapp.png" alt="WhatsApp" /></a>
+    <a href="https://www.instagram.com/efectopositivoradio/" target="_blank"><img src="../assets/images/instagram.png" alt="Instagram" /></a>
+    <a href="https://www.youtube.com/@radioefectopositivo" target="_blank"><img src="../assets/images/youtube.png" alt="YouTube" /></a>
+    <a href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"><img src="../assets/images/facebook.png" alt="Facebook" /></a>
+  </div>
+
+  <div class="footer-copy">
+    © 2023 Radio Efecto Positivo. CDD, Villa Ballester.
+  </div>
+</footer>
+
+
+  <!-- SCRIPTS -->
+  <script src="../js/radio.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- GLightbox JS -->
+<script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+<script>
+  const lightbox = GLightbox({
+    selector: '.glightbox'
+  });
+</script>
+<script>
+  document.getElementById('verMasBtn').addEventListener('click', function () {
+    document.querySelectorAll('.hidden-img').forEach(img => {
+      img.style.display = 'block';
+    });
+    this.style.display = 'none';
+  });
+</script>
+<script>
+  const verMasBtn = document.getElementById('verMasBtn');
+  const imagenesOcultas = document.querySelectorAll('.hidden-img');
+
+  verMasBtn.addEventListener('click', () => {
+    imagenesOcultas.forEach(img => {
+      img.classList.add('visible');
+    });
+    verMasBtn.style.display = 'none';
+  });
+</script>
+
+
+</body>
+</html>

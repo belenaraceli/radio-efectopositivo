@@ -1,108 +1,194 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-	<meta charset="utf-8">
-	<title>Radio Efecto Positivo</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radio Efecto Positivo</title>
 
-	<meta property="og:url" content="https://radioefectopositivo.com/" />
-	<meta property="og:type" content="website" />
-	<meta property="og:title" content="Radio Efecto Positivo" />
-	<meta property="og:description" content="La Radio de Casa De Dios Villa Ballester." />
-	<meta property="og:image" content="https://radioefectopositivo.com/logo.jpg" />
+  <meta property="og:url" content="https://radioefectopositivo.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Radio Efecto Positivo" />
+  <meta property="og:description" content="La Radio de Casa De Dios Villa Ballester." />
+  <meta property="og:image" content="https://radioefectopositivo.com/logo.jpg" />
 
-    <meta http-equiv="Expires" content="0">
-    <meta http-equiv="Last-Modified" content="0">
-    <meta http-equiv="Cache-Control" content="no-cache, mustrevalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-
-	<link rel="stylesheet" type="text/css" href="css/efectopositivo.css">
-	<link rel="stylesheet" type="text/css" href="css/normalize.css">
-	<link rel="shortcut icon" href="assets/images/icon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat&display=swap" rel="stylesheet">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<script src="https://kit.fontawesome.com/730e4187c7.js" crossorigin="anonymous"></script>
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/normalize.css" />
+  <link rel="shortcut icon" href="assets/images/icon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://kit.fontawesome.com/730e4187c7.js" crossorigin="anonymous"></script>
 </head>
+
 <body>
-	<div class="content">
 
-		<div class="header">
+  <!-- HEADER MOBILE -->
+  <header class="header-mobile d-block d-lg-none">
+    <div class="top-bar-mobile">
+      <div class="top-container">
+        <!-- Botón Hamburguesa (abre menú lateral) -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasMenu" aria-controls="offcanvasMenu">
+          <div class="toggler-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </button>
 
-		<div class="rss">
-      
-        <a class="wpp" href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"> <img src="assets/images/whatsapp.png"></a>
-		<a class="insta" href="https://www.instagram.com/efectopositivoradio/" target="_blank"> <img src="assets/images/instagram.png"></a>
-		<a class="yt" href="https://www.youtube.com/@radioefectopositivo" target="_blank"> <img src="assets/images/youtube.png"></a>  
-		<a class="fb" href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"> <img src="assets/images/facebook.png"></a>
+        <!-- Logo -->
+        <img src="assets/images/logo-mobile.png" alt="Logo Radio Efecto Positivo" class="logo-mobile">
+      </div>
+    </div>
 
-	    </div>
+    <!-- Segunda franja con redes + botón -->
+    <div class="navbar-mobile">
+      <div class="social-icons">
+        <a href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"><img src="assets/images/whatsapp.png" alt="WhatsApp"></a>
+        <a href="https://www.instagram.com/efectopositivoradio/" target="_blank"><img src="assets/images/instagram.png" alt="Instagram"></a>
+        <a href="https://www.youtube.com/@radioefectopositivo" target="_blank"><img src="assets/images/youtube.png" alt="YouTube"></a>
+        <a href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"><img src="assets/images/facebook.png" alt="Facebook"></a>
+      </div>
+        <div class="vivo">
+        <div class="parpadea circulo"></div>
+        <a class="radio" onclick="vivo()"> Radio en vivo</a>
+      </div>
+    </div>
+  </header>
 
-		<div class="logo">
+  <!-- MENÚ LATERAL MOBILE (Bootstrap Offcanvas) -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasMenu" aria-labelledby="offcanvasMenuLabel">
+    <div class="offcanvas-header">
+      <button type="button" class="btn-close close-red ms-auto" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column align-items-center justify-content-center text-center">
+      <a class="nav-link" href="index.html">Inicio</a>
+      <a class="nav-link" href="pages/programacion.html">Programación</a>
+      <a class="nav-link" href="pages/ondemand.html">On Demand</a>
+      <a class="nav-link" href="pages/galeria.html">Galeria</a>
+      <a class="nav-link" href="pages/contacto.html">Contacto</a>
+    </div>
+  </div>
 
-			<a class="logo" href="index.html"> <img src="assets/images/logo.png"></a>
+  <!-- CONTENIDO GENERAL -->
+  <div class="content">
+    <!-- HEADER DESKTOP -->
+    <div class="header d-none d-lg-flex">
+      <div class="rss">
+        <a href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"><img src="assets/images/whatsapp.png" alt="WhatsApp"></a>
+        <a href="https://www.instagram.com/efectopositivoradio/" target="_blank"><img src="assets/images/instagram.png" alt="Instagram"></a>
+        <a href="https://www.youtube.com/@radioefectopositivo" target="_blank"><img src="assets/images/youtube.png" alt="YouTube"></a>
+        <a href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"><img src="assets/images/facebook.png" alt="Facebook"></a>
+      </div>
 
-	    </div>
+      <div class="logo">
+        <a href="index.html"><img src="assets/images/logo.png" alt="Logo" /></a>
+      </div>
 
-	    <div class="vivo">
-	    	<div class="parpadea circulo"></div><a class="radio" onclick="vivo()"> Radio en vivo</a>
+      <div class="vivo">
+        <div class="parpadea circulo"></div>
+        <a class="radio" onclick="vivo()"> Radio en vivo</a>
+      </div>
+    </div>
 
-	    </div>
-
+    <!-- NAVBAR DESKTOP -->
+    <nav class="navbar navbar-expand-lg custom-navbar sticky-top d-none d-lg-block w-100">
+      <div class="container-fluid justify-content-center">
+        <div class="collapse navbar-collapse justify-content-center" id="navbarMenu">
+          <ul class="navbar-nav text-uppercase">
+            <li class="nav-item"><a class="nav-link" href="index.html">Inicio</a></li>
+            <li class="nav-item"><a class="nav-link" href="pages/programacion.html">Programación</a></li>
+            <li class="nav-item"><a class="nav-link" href="pages/ondemand.html">On Demand</a></li>
+            <li class="nav-item"><a class="nav-link" href="pages/galeria.html">Galeria</a></li>
+            <li class="nav-item"><a class="nav-link" href="pages/contacto.html">Contacto</a></li>
+          </ul>
         </div>
+      </div>
+    </nav>
 
-        <div class="notheader">
-        	<div class="container">
-			<nav>
-				<a href="index.html">Inicio</a>
-				<a href="programacion.html">Programación</a>
-				<a href="videos.html">Videos</a>
-				<a href="congreso.html">Congreso 2024</a>
-				<a href="contacto.html">Contacto</a>
-			</nav>
-			<button class="hamburger">
-				<div class="bar"></div>
-			</button>
-		    </div>
-		</div>
+    <!-- MAIN -->
+    <div class="main">
 
-	    <nav class="mobile-nav">
-	    	<a href="index.html">Inicio</a>
-	    	<a href="programacion.html">Programación</a>
-	    	<a href="videos.html">Videos</a>
-	    	<a href="congreso.html">Congreso 2024</a>
-	    	<a href="contacto.html">Contacto</a>
-	    </nav>
+      <div class="streaming-banner">
+        <p>◯ Streaming 24 horas</p>
+      </div>
 
-		<div class="main">
+      <div class="escuchanos">
+        <p>Escuchanos en vivo desde cualquier lugar del mundo. Música, mensajes de esperanza, y una comunidad que te acompaña.</p>
+      </div>
 
-			<div class="video">
-			 <div style="position: relative; overflow: hidden; width: 100%;padding-top: 56.25%;"><iframe width="560" height="300" src="https://vivo.solumedia.com:2020/VideoPlayer/nohablespormi?autoplay=1" style="position: absolute;top: 0;left: 0;bottom: 0;right: 0;width: 100%;height: 100%;" scrolling="no" frameborder="0" allow="autoplay" allowfullscreen webkitallowfullscreen mozallowfullscreen oallowfullscreen msallowfullscreen></iframe>
-			 </div>
-		    </div>
+      <hr>
+
+      <div class="video">
+        <div style="position: relative; overflow: hidden; width: 100%; padding-top: 56.25%;">
+          <iframe src="https://vivo.solumedia.com:2020/VideoPlayer/nohablespormi?autoplay=1" style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;" frameborder="0" allow="autoplay" allowfullscreen scrolling="no"></iframe>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="descarga">
+        <img src="assets/videos/app2.gif" class="appdesk" />
+        <img src="assets/videos/app2.gif" class="appmob" />
+      </div>
+
+      <div class="play">
+        <a href="https://play.google.com/store/search?q=radio%20efecto%20positivo&c=apps&hl=es" target="_blank"><img src="assets/images/playstore.png" alt="Play Store" /></a>
+      </div>
+
+      <div class="reels"></div>
+    </div>
+
+    <!-- Versión MOBILE -->
+<section class="seccion-iglesia-mobile d-block d-md-none">
+  <div class="iglesia-imagen-mobile">
+    <img src="assets/images/iglesia.jpg" alt="Iglesia">
+    <div class="iglesia-texto-overlay">
+      <h2>Somos la radio 
+        <br>
+        de Casa de Dios</h2>
+      <p>Radio Efecto Positivo nace como una extensión del mensaje de esperanza de Casa de Dios, una iglesia ubicada en Villa Ballester que busca compartir fe, valores y buenas noticias a través de cada transmisión.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Versión DESKTOP -->
+<section class="seccion-iglesia-desktop d-none d-md-flex">
+  <div class="iglesia-imagen">
+    <img src="assets/images/iglesia.jpg" alt="Iglesia">
+  </div>
+  <div class="iglesia-texto">
+    <h2>Somos la radio de Casa de Dios</h2>
+    <p>Radio Efecto Positivo nace como una extensión del mensaje de esperanza de Casa de Dios, una iglesia ubicada en Villa Ballester que busca compartir fe, valores y buenas noticias a través de cada transmisión.</p>
+  </div>
+</section>
 
 
-            <div class="descarga">
-            	<img src="assets/videos/app.gif" class="appdesk"> 
-            	<img src="assets/videos/appmobile.gif" class="appmob">
-            </div>
 
+    <!-- FOOTER -->
+   <footer class="footer">
+  <img src="assets/images/logo.jpg" alt="Logo" class="footer-logo" />
 
-            <div class="play">
-            	<a href="https://play.google.com/store/search?q=radio%20efecto%20positivo&c=apps&hl=es" target="_blank"><img src="assets/images/playstore.png"></a>
-            </div>
-            
-            <div class="reels">
+  <div class="footer-nav">
+    <a href="index.html">Inicio</a>
+    <a href="programacion.html">Programación</a>
+    <a href="videos.html">Videos</a>
+    <a href="galeria.html">Galería</a>
+    <a href="contacto.html">Contacto</a>
+  </div>
 
-            </div>
+  <div class="footer-social">
+    <a href="https://api.whatsapp.com/send?phone=541131961588" target="_blank"><img src="assets/images/whatsapp.png" alt="WhatsApp" /></a>
+    <a href="https://www.instagram.com/efectopositivoradio/" target="_blank"><img src="assets/images/instagram.png" alt="Instagram" /></a>
+    <a href="https://www.youtube.com/@radioefectopositivo" target="_blank"><img src="assets/images/youtube.png" alt="YouTube" /></a>
+    <a href="https://www.facebook.com/EfectoPositivoRadio" target="_blank"><img src="assets/images/facebook.png" alt="Facebook" /></a>
+  </div>
 
+  <div class="footer-copy">
+    © 2023 Radio Efecto Positivo. CDD, Villa Ballester.
+  </div>
+</footer>
 
-
-		<footer class="footer">
-        <div> <img src="assets/images/logo.jpg" style="width: 65px; filter: grayscale(100%) opacity(0%);"></div>
-		© 2023 Radio Efecto Positivo. CDD, Villa Ballester.</footer>
-
-	</div>
-	<script src="js/radio.js"></script>
+  <!-- SCRIPTS -->
+  <script src="js/radio.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
 </html>

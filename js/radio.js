@@ -16,6 +16,22 @@ window.onload = function () {
 	});
 }
 
+  document.addEventListener('DOMContentLoaded', () => {
+    const elementos = document.querySelectorAll('.texto');
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('mostrar');
+          observer.unobserve(entry.target); // Se ejecuta una sola vez
+        }
+      });
+    }, {
+      threshold: 0.3 // Se activa cuando el 30% del elemento está visible
+    });
+
+    elementos.forEach(el => observer.observe(el));
+  });
 
 function vivo() {
 	window.open('https://01.solumedia.com.ar/AudioPlayer/nohablespormi?mount', 'RADIO EN VIVO' , 'width=315px height=500px'); 
