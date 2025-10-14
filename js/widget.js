@@ -1,11 +1,11 @@
 /* js/widget.js
-   Widget cliente con:
-   - Tabs: "Todos los videos" + playlists
-   - Paginación por páginas numeradas (pageSize = 10 por defecto)
-   - Orden global (Más recientes / Más antiguos)
-   - Búsqueda (Prev/Next style)
-   - Live botón aparece solo si hay transmisión
+   Versión actualizada:
+   - Filtra playlists a mostrar (solo las 4 indicadas)
+   - Evita apilar videos al cambiar tabs (limpia + abort controller)
+   - Paginación por páginas, orden asc/desc, live detect
+   - Listo para usar con data-endpoint apuntando a tu /api/youtube en Vercel
 */
+
 (function(){
   function ready(fn){ if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
   function findScript(){ if (document.currentScript) return document.currentScript; const s = Array.from(document.getElementsByTagName('script')); for (let i=s.length-1;i>=0;i--){ const sc=s[i]; if (sc.dataset && (sc.dataset.endpoint||sc.dataset.channelId)) return sc; } return s[s.length-1]||null; }
@@ -13,29 +13,37 @@
   ready(async function(){
     const sc = findScript();
     if (!sc){ console.error('widget script tag not found'); return; }
+
     const ENDPOINT = sc.dataset.endpoint || '/api/youtube';
     const CHANNEL = (sc.dataset.channelId || '@radioefectopositivo').replace(/^@/,'');
     const PAGE_SIZE = Number(sc.dataset.pageSize || 10);
 
+    // Contenedor principal (debe existir en la página)
     const root = document.getElementById('youtube-widget');
     if (!root){ console.error('#youtube-widget not found'); return; }
     root.innerHTML = '';
 
-    // shell
+    // --- Lista blanca de playlists (texto exacto tal como aparecen en YouTube) ---
+    const ALLOWED_PLAYLIST_TITLES = [
+      'Vuelta a casa',
+      'Conociendo a Dios',
+      'Jesus... la revelación',
+      'Encuentro con Efecto Positivo'
+    ];
+    // Si preferís filtrar por IDs en vez de títulos, reemplazá por los IDs.
+
+    // --- Build UI ---
     const shell = document.createElement('div'); shell.className='ywp-shell';
     const header = document.createElement('div'); header.className='ywp-header';
     const tabsWrap = document.createElement('div'); tabsWrap.className='ywp-tabs';
     const searchWrap = document.createElement('div'); searchWrap.className='ywp-search-wrap';
     const searchInput = document.createElement('input'); searchInput.type='search'; searchInput.placeholder='Buscar...'; searchInput.className='ywp-search';
     searchWrap.appendChild(searchInput);
-
     const orderWrap = document.createElement('div'); orderWrap.className='ywp-order-wrap';
     const orderSelect = document.createElement('select'); orderSelect.className='ywp-select';
-    const o1 = document.createElement('option'); o1.value='date_desc'; o1.textContent='Más recientes';
-    const o2 = document.createElement('option'); o2.value='date_asc'; o2.textContent='Más antiguos';
-    orderSelect.appendChild(o1); orderSelect.appendChild(o2);
-    orderWrap.appendChild(orderSelect);
-
+    const opt1 = document.createElement('option'); opt1.value='date_desc'; opt1.textContent='Más recientes';
+    const opt2 = document.createElement('option'); opt2.value='date_asc'; opt2.textContent='Más antiguos';
+    orderSelect.appendChild(opt1); orderSelect.appendChild(opt2); orderWrap.appendChild(orderSelect);
     const liveWrap = document.createElement('div'); liveWrap.className='ywp-live-wrap';
     const liveBtn = document.createElement('button'); liveBtn.className='ywp-live-btn'; liveBtn.style.display='none';
     liveWrap.appendChild(liveBtn);
@@ -44,7 +52,8 @@
     shell.appendChild(header);
 
     const content = document.createElement('div'); content.className='ywp-content';
-    const grid = document.createElement('div'); grid.className='ywp-grid'; content.appendChild(grid);
+    const grid = document.createElement('div'); grid.className='ywp-grid';
+    content.appendChild(grid);
     shell.appendChild(content);
 
     const pager = document.createElement('div'); pager.className='ywp-pager';
@@ -54,17 +63,17 @@
     pager.appendChild(prevBtn); pager.appendChild(pagesWrap); pager.appendChild(nextBtn);
     shell.appendChild(pager);
 
-    // modal
-    const modal = document.createElement('div'); modal.className='ywp-modal'; modal.innerHTML = `<div class="ywp-modal-content" role="dialog"><button class="ywp-modal-close">Cerrar ✖</button><iframe class="ywp-modal-iframe" src="" allowfullscreen></iframe></div>`;
+    const modal = document.createElement('div'); modal.className='ywp-modal';
+    modal.innerHTML = `<div class="ywp-modal-content" role="dialog"><button class="ywp-modal-close">Cerrar ✖</button><iframe class="ywp-modal-iframe" src="" allowfullscreen></iframe></div>`;
     document.body.appendChild(modal);
     const modalIframe = modal.querySelector('.ywp-modal-iframe'); const modalClose = modal.querySelector('.ywp-modal-close');
-    function openModal(id){ modal.style.display='flex'; modalIframe.src=`https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1`; }
+    function openModal(id){ modal.style.display='flex'; modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1`; }
     function closeModal(){ modal.style.display='none'; modalIframe.src=''; }
     modalClose.addEventListener('click', closeModal); modal.addEventListener('click', (e)=>{ if(e.target===modal) closeModal(); });
 
     root.appendChild(shell);
 
-    // inject minimal styles (you already had dark theme; keep consistent)
+    // --- Styles (dark, responsive) ---
     if (!document.getElementById('ywp-styles')) {
       const css = document.createElement('style'); css.id='ywp-styles';
       css.textContent = `
@@ -92,82 +101,85 @@
       document.head.appendChild(css);
     }
 
-    // state
-    let playlists = []; // {id,title,count}
-    let activeTab = { type: 'uploads' , id: null }; // type: uploads | playlist | search
+    // --- State ---
+    let playlists = [];
+    let activeTab = { type: 'uploads', id: null }; // uploads | playlist | search
     let currentPage = 1;
     let pageCount = null;
     let currentOrder = orderSelect.value || 'date_desc';
     let lastQuery = '';
     let liveChecked = false;
 
+    // --- AbortController + stale-response protection ---
+    let currentFetchController = null;
+    let lastRequestId = 0;
+
+    // helper to create tab button
     function createTabElement(title, meta){
       const btn = document.createElement('button'); btn.className='ywp-tab'; btn.textContent = title;
       btn.dataset.meta = JSON.stringify(meta || {});
       return btn;
     }
 
-    // fetch playlists and build tabs
-    async function initTabs(){
-      try {
-        const data = await fetchApi({ action:'playlists', limit:50 });
-        playlists = data.playlists || [];
-        tabsWrap.innerHTML = '';
-        // Todos los videos tab (uploads)
-        const tabAll = createTabElement('Todos los videos', { type:'uploads' });
-        tabAll.classList.add('active');
-        tabsWrap.appendChild(tabAll);
-        tabAll.addEventListener('click', ()=> { activateTab({type:'uploads'}); });
-
-        // playlist tabs
-        playlists.forEach(pl => {
-          const t = createTabElement(pl.title, { type:'playlist', id: pl.id, count: pl.count });
-          tabsWrap.appendChild(t);
-          t.addEventListener('click', ()=> { activateTab({type:'playlist', id: pl.id}); });
-        });
-      } catch(e){
-        console.error('Error cargando playlists', e);
-        tabsWrap.innerHTML = '<div style="color:#f88">Error cargando playlists</div>';
-      }
-    }
-
-    // wrapper to call backend
+    // --- fetch wrapper with abort + stale protection ---
     async function fetchApi(params){
+      // abort previous request (we do it here to centralize)
+      if (currentFetchController) {
+        try { currentFetchController.abort(); } catch(e){}
+        currentFetchController = null;
+      }
+      currentFetchController = new AbortController();
+      const thisRequestId = ++lastRequestId;
+
       const url = new URL(ENDPOINT, location.origin);
       Object.keys(params || {}).forEach(k => { if (params[k] !== undefined && params[k] !== null) url.searchParams.set(k, params[k]); });
-      // always set channelId and pageSize
       if (!url.searchParams.get('channelId')) url.searchParams.set('channelId', CHANNEL);
       if (!url.searchParams.get('pageSize')) url.searchParams.set('pageSize', PAGE_SIZE);
       if (!url.searchParams.get('order')) url.searchParams.set('order', currentOrder);
-      const r = await fetch(url.toString());
-      if (!r.ok) {
-        const t = await r.text().catch(()=>null);
-        throw new Error(`Status ${r.status} - ${t||r.statusText}`);
+
+      try {
+        const r = await fetch(url.toString(), { signal: currentFetchController.signal });
+        if (!r.ok) {
+          const t = await r.text().catch(()=>null);
+          throw new Error(`Status ${r.status} - ${t||r.statusText}`);
+        }
+        const json = await r.json();
+        // if a newer request started, ignore this response
+        if (thisRequestId !== lastRequestId) {
+          const e = new Error('stale');
+          e.name = 'StaleResponse';
+          throw e;
+        }
+        return json;
+      } catch (err) {
+        // pass abort/stale up for callers to ignore silently
+        throw err;
+      } finally {
+        // don't null controller here; we want to keep it until next call or abort
       }
-      return r.json();
     }
 
-    // render videos array into grid
+    // --- render functions ---
     function renderVideos(videos){
       grid.innerHTML = '';
-      if (!videos || !videos.length) { grid.innerHTML = '<div>No se encontraron videos.</div>'; return; }
+      if (!videos || !videos.length) {
+        grid.innerHTML = '<div>No se encontraron videos.</div>';
+        return;
+      }
       videos.forEach(v => {
         const card = document.createElement('div'); card.className='yt-video-card';
         const thumb = document.createElement('div'); thumb.className='yt-video-thumb';
         thumb.style.backgroundImage = `url("${v.thumbnail || (`https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`)}")`;
         const title = document.createElement('div'); title.className='yt-video-title'; title.textContent = v.title || 'Sin título';
         card.appendChild(thumb); card.appendChild(title);
-        card.addEventListener('click', ()=> openModal(v.id));
-        // store meta
         card.dataset.published = v.publishedAt || '';
+        card.addEventListener('click', ()=> openModal(v.id));
         grid.appendChild(card);
       });
     }
 
-    // pager rendering (simple window)
     function renderPager(){
       pagesWrap.innerHTML = '';
-      // if pageCount known, render numeric pages; else show current and next/prev only
       if (pageCount && pageCount > 1) {
         const total = pageCount;
         const maxButtons = 7;
@@ -189,48 +201,97 @@
       nextBtn.disabled = (pageCount ? currentPage >= pageCount : false);
     }
 
-    // navigate
-    async function goToPage(p){
-      currentPage = Math.max(1, Number(p||1));
-      await loadPage();
+    // --- tab init: fetch playlists but filter por lista blanca ---
+    async function initTabs(){
+      try {
+        const data = await fetchApi({ action:'playlists', limit:50 });
+        // filter playlists by allowed titles
+        const filtered = (data.playlists || []).filter(pl => ALLOWED_PLAYLIST_TITLES.includes(pl.title));
+        playlists = filtered;
+        tabsWrap.innerHTML = '';
+        const tabAll = createTabElement('Todos los videos', { type:'uploads' });
+        tabAll.classList.add('active');
+        tabAll.addEventListener('click', ()=> { activateTab({ type:'uploads' }); });
+        tabsWrap.appendChild(tabAll);
+
+        playlists.forEach(pl => {
+          const t = createTabElement(pl.title, { type:'playlist', id: pl.id, count: pl.count });
+          t.addEventListener('click', ()=> { activateTab({ type:'playlist', id: pl.id }); });
+          tabsWrap.appendChild(t);
+        });
+      } catch (err) {
+        console.error('Error cargando playlists', err);
+        tabsWrap.innerHTML = '<div style="color:#f88">Error cargando playlists</div>';
+      }
     }
 
-    prevBtn.addEventListener('click', ()=> { if (currentPage>1) goToPage(currentPage-1); });
-    nextBtn.addEventListener('click', ()=> { if (!pageCount || currentPage < pageCount) goToPage(currentPage+1); });
+    // --- activate tab (limpia, aborta peticiones previas, carga primera página) ---
+    async function activateTab(tabSpec){
+      // UI: marcar activa
+      Array.from(tabsWrap.children).forEach(ch => ch.classList.remove('active'));
+      // buscar el boton que tenga meta coincidente y marcarlo
+      for (let btn of Array.from(tabsWrap.children)) {
+        try {
+          const meta = JSON.parse(btn.dataset.meta || '{}');
+          if (tabSpec.type === 'uploads' && meta.type === 'uploads') { btn.classList.add('active'); break; }
+          if (tabSpec.type === 'playlist' && meta.type === 'playlist' && meta.id === tabSpec.id) { btn.classList.add('active'); break; }
+        } catch(e){}
+      }
 
-    // main loader: based on activeTab
-    async function loadPage(){
-      grid.innerHTML = '<div style="color:#bbb">Cargando...</div>';
+      // reset state immediately (para evitar apilamiento visual)
+      activeTab = tabSpec;
+      currentPage = 1;
+      pageCount = null;
+      lastQuery = '';
+      grid.innerHTML = '';                // limpieza inmediata
       setLiveVisible(false);
+
+      // abort any ongoing request
+      if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      lastRequestId++; // invalidate previous responses too
+
+      // cargar primera página
+      await loadPage().catch(e => {
+        // si fue abort o stale, ignorar silenciosamente
+        if (e && (e.name === 'AbortError' || e.name === 'StaleResponse' || e.message === 'stale')) return;
+        // otherwise log
+        console.error('activateTab loadPage error', e);
+      });
+    }
+
+    // --- loadPage: carga la página actual según activeTab ---
+    async function loadPage(){
+      // muestra loading breve
+      grid.innerHTML = '<div style="color:#bbb">Cargando...</div>';
       try {
-        let params = { action: '', page: currentPage };
+        let params = { action:'', page: currentPage };
         if (activeTab.type === 'uploads') { params.action = 'uploads'; }
         else if (activeTab.type === 'playlist') { params.action = 'playlistVideos'; params.playlistId = activeTab.id; }
-        else return;
+        else { grid.innerHTML = ''; return; }
 
-        // if we're in search mode (activeTab.type === 'search'), different flow (not used here)
         const data = await fetchApi(params);
         // render
         renderVideos(data.videos || []);
-        // page and pageCount
+        // update pagination state
         pageCount = data.pageCount || null;
         currentPage = data.page || currentPage;
         renderPager();
 
-        // check live (only once)
+        // check live once
         if (!liveChecked) {
           try {
             const live = await fetchApi({ action:'live' });
             liveChecked = true;
-            if (live && live.live) {
-              setLiveVisible(true, live.live.id);
-            } else {
-              setLiveVisible(false);
-            }
+            if (live && live.live) setLiveVisible(true, live.live.id);
+            else setLiveVisible(false);
           } catch(e){ setLiveVisible(false); }
         }
 
       } catch (err) {
+        // ignore abort/stale silently
+        if (err && (err.name === 'AbortError' || err.name === 'StaleResponse' || err.message === 'stale')) {
+          return;
+        }
         console.error('Error loadPage', err);
         grid.innerHTML = `<div style="color:#f88">Error cargando videos.</div>`;
       }
@@ -247,39 +308,27 @@
       }
     }
 
-    // activate tab (type: uploads | playlist)
-    async function activateTab(tabSpec){
-      // mark tabs active UI
-      Array.from(tabsWrap.children).forEach(ch => ch.classList.remove('active'));
-      // find button that matches meta
-      for (let btn of Array.from(tabsWrap.children)) {
-        const meta = JSON.parse(btn.dataset.meta || '{}');
-        if (tabSpec.type === 'uploads' && meta.type === 'uploads') { btn.classList.add('active'); break; }
-        if (tabSpec.type === 'playlist' && meta.type === 'playlist' && meta.id === tabSpec.id) { btn.classList.add('active'); break; }
-      }
-      // set state
-      activeTab = tabSpec;
-      currentPage = 1;
-      pageCount = null;
+    async function goToPage(p){
+      currentPage = Math.max(1, Number(p||1));
+      // abort previous request to avoid stacking
+      if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      lastRequestId++;
       await loadPage();
     }
+    prevBtn.addEventListener('click', ()=> { if (currentPage>1) goToPage(currentPage-1); });
+    nextBtn.addEventListener('click', ()=> { if (!pageCount || currentPage < pageCount) goToPage(currentPage+1); });
 
-    // search (we'll use search action with simple prev/next flow)
-    let searchToken = '';
-    searchInput.addEventListener('keydown', async (e)=> {
-      if (e.key === 'Enter') {
-        const q = searchInput.value.trim();
-        if (!q) return;
-        // switch to search mode (we'll reuse activeTab.type='search' for logic)
-        activeTab = { type:'search' };
-        currentPage = 1;
-        lastQuery = q;
-        await runSearch(q);
-      }
-    });
-
-    async function runSearch(q, pageToken = '') {
-      grid.innerHTML = '<div style="color:#bbb">Buscando...</div>';
+    // --- search: Enter para buscar, usa search action con prev/next (sin numeración) ---
+    let lastSearchToken = '';
+    searchInput.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return;
+      const q = searchInput.value.trim();
+      if (!q) return;
+      // reset state for search
+      activeTab = { type:'search' };
+      currentPage = 1;
+      pageCount = null;
+      grid.innerHTML = '';
       try {
         const url = new URL(ENDPOINT, location.origin);
         url.searchParams.set('action','search');
@@ -287,34 +336,33 @@
         url.searchParams.set('pageSize', PAGE_SIZE);
         url.searchParams.set('order', currentOrder);
         url.searchParams.set('channelId', CHANNEL);
-        if (pageToken) url.searchParams.set('pageToken', pageToken);
         const r = await fetch(url.toString());
         if (!r.ok) throw new Error('Error en búsqueda');
         const data = await r.json();
         renderVideos(data.videos || []);
-        // search returns simple prev/next flags; we won't render numeric pages here
         prevBtn.disabled = !data.prevPage;
         nextBtn.disabled = !data.nextPage;
         pagesWrap.innerHTML = `<span style="color:#ddd">Resultados para "${q}"</span>`;
-        // set live check to false (no change)
-      } catch(e){
-        console.error('search error', e);
+      } catch(err) {
+        console.error('search error', err);
         grid.innerHTML = `<div style="color:#f88">Error en búsqueda.</div>`;
       }
-    }
+    });
 
-    // order change
+    // --- order change ---
     orderSelect.addEventListener('change', async ()=>{
       currentOrder = orderSelect.value;
+      // reset and reload current tab from page 1
       currentPage = 1;
       pageCount = null;
+      if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      lastRequestId++;
       await loadPage();
     });
 
-    // initialize tabs and first load
+    // --- init ---
     await initTabs();
-    // default activate uploads
     await activateTab({ type:'uploads' });
 
-  }); // ready
+  }); // ready end
 })();
