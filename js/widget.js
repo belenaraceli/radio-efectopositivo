@@ -206,7 +206,7 @@
       try {
         const data = await fetchApi({ action:'playlists', limit:50 });
         // filter playlists by allowed titles
-        const filtered = (data.playlists || []).filter(pl => ALLOWED_PLAYLIST_TITLES.includes(pl.title));
+        const filtered = (data.playlists || []).filter(pl => ALLOWED_PLAYLISTS.includes(pl.title));
         playlists = filtered;
         tabsWrap.innerHTML = '';
         const tabAll = createTabElement('Todos los videos', { type:'uploads' });
