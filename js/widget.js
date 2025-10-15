@@ -23,14 +23,14 @@
     if (!root){ console.error('#youtube-widget not found'); return; }
     root.innerHTML = '';
 
-    // --- Lista blanca de playlists (texto exacto tal como aparecen en YouTube) ---
+    // --- Lista blanca de playlists  ---
     const ALLOWED_PLAYLIST_TITLES = [
-      'Vuelta a casa',
-      'Conociendo a Dios',
-      'Jesus... la revelación',
-      'Encuentro con Efecto Positivo'
+      { id: 'PL06d3Nw-68RVfTySoWo04Zf2-s3aEI2B4', title: 'Vuelta a casa' },
+      { id: 'PL06d3Nw-68RU0lodA7BjIUCqCQjc7ptAL', title: 'Conociendo a Dios' },
+      { id: 'PL06d3Nw-68RU5zyPjHEOYtT1VIdX6QlNC', title: 'Jesus... la revelación' },
+      { id: 'PL06d3Nw-68RVRPINt4Grb74yn5p8TmFyp', title: 'Encuentro con Efecto Positivo' }
     ];
-    // Si preferís filtrar por IDs en vez de títulos, reemplazá por los IDs.
+    
 
     // --- Build UI ---
     const shell = document.createElement('div'); shell.className='ywp-shell';
