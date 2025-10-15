@@ -24,7 +24,7 @@
     root.innerHTML = '';
 
     // --- Lista blanca de playlists  ---
-    const ALLOWED_PLAYLIST_TITLES = [
+    const ALLOWED_PLAYLISTS = [
       { id: 'PL06d3Nw-68RVfTySoWo04Zf2-s3aEI2B4', title: 'Vuelta a casa' },
       { id: 'PL06d3Nw-68RU0lodA7BjIUCqCQjc7ptAL', title: 'Conociendo a Dios' },
       { id: 'PL06d3Nw-68RU5zyPjHEOYtT1VIdX6QlNC', title: 'Jgit add js/widget.jsesus... la revelación' },
