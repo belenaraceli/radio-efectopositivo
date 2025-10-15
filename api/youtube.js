@@ -1,6 +1,6 @@
 // api/youtube.js
 // Vercel serverless handler para exponer endpoints que consume widget.js
-// Required env: YT_API_KEY
+// Required env: YOUTUBE_API_KEY
 //
 // Actions supported (via query param `action`):
 //  - playlists&limit=50&channelId=...         -> devuelve { playlists: [{id,title,count}, ...] }
@@ -9,15 +9,15 @@
 //  - live&channelId=...                       -> { live: { id, title, url } } or { live: null }
 //  - search&q=...&channelId=...&pageSize=10   -> { videos: [...], nextPageToken... }
 // 
-// Deploy en Vercel: asegúrate de configurar YT_API_KEY en Environment Variables
+// Deploy en Vercel: asegúrate de configurar YOUTUBE_API_KEY en Environment Variables
 // No incluyas tu API key en el código.
 
 const YT = 'https://www.googleapis.com/youtube/v3';
-const API_KEY = process.env.YT_API_KEY || '';
+const API_KEY = process.env.YOUTUBE_API_KEY || '';
 const DEFAULT_CHANNEL = process.env.DEFAULT_CHANNEL_ID || ''; // opcional
 
 if (!API_KEY) {
-  console.warn('YT API KEY not set - set YT_API_KEY env var');
+  console.warn('YT API KEY not set - set YOUTUBE_API_KEY env var');
 }
 
 // Helper: fetch wrapper
@@ -127,7 +127,7 @@ export default async function handler(req) {
     const detectLive = params.get('detectLive') === '1' || params.get('detectLive') === 'true';
 
     if (!API_KEY) {
-      return jsonResponse({ error: 'YT API key not configured (env YT_API_KEY)' }, 500);
+      return jsonResponse({ error: 'YT API key not configured (env YOUTUBE_API_KEY)' }, 500);
     }
 
     // --- ACTION: playlists ---
@@ -233,7 +233,7 @@ export default async function handler(req) {
     return jsonResponse({
       message: 'YouTube API proxy endpoint',
       actions: ['playlists', 'playlistVideos', 'uploads', 'search', 'live'],
-      notes: 'Set YT_API_KEY env var in Vercel. Use ?action=uploads&channelId=... or action=playlists&channelId=...'
+      notes: 'Set YOUTUBE_API_KEY env var in Vercel. Use ?action=uploads&channelId=... or action=playlists&channelId=...'
     });
   } catch (err) {
     console.error('youtube api error', err);
