@@ -1,249 +1,242 @@
 // api/youtube.js
-// Vercel serverless handler - YouTube Data API helper with paged pages + tabs/playlists support
-// Requiere process.env.YOUTUBE_API_KEY
-const API_BASE = 'https://www.googleapis.com/youtube/v3';
-const CACHE = {}; // general cache
-const PAGE_TOKENS = {}; // cache page tokens for playlists/uploads in date_desc mode
-const DEFAULT_TTL = 5 * 60 * 1000; // 5 min
+// Vercel serverless handler para exponer endpoints que consume widget.js
+// Required env: YT_API_KEY
+//
+// Actions supported (via query param `action`):
+//  - playlists&limit=50&channelId=...         -> devuelve { playlists: [{id,title,count}, ...] }
+//  - playlistVideos&playlistId=...&pageSize=10&pageToken=... -> { videos: [...], pageToken..., nextPageToken..., prevPageToken... }
+//  - uploads&pageSize=10&pageToken=...&channelId=... -> videos del playlist "uploads" del canal
+//  - live&channelId=...                       -> { live: { id, title, url } } or { live: null }
+//  - search&q=...&channelId=...&pageSize=10   -> { videos: [...], nextPageToken... }
+// 
+// Deploy en Vercel: asegúrate de configurar YT_API_KEY en Environment Variables
+// No incluyas tu API key en el código.
 
-function nowMs(){ return Date.now(); }
-function cacheGet(key){ const c = CACHE[key]; if (c && c.expiry > nowMs()) return c.data; return null; }
-function cacheSet(key, data, ttl = DEFAULT_TTL){ CACHE[key] = { expiry: nowMs() + ttl, data }; }
+const YT = 'https://www.googleapis.com/youtube/v3';
+const API_KEY = process.env.YT_API_KEY || '';
+const DEFAULT_CHANNEL = process.env.DEFAULT_CHANNEL_ID || ''; // opcional
 
+if (!API_KEY) {
+  console.warn('YT API KEY not set - set YT_API_KEY env var');
+}
+
+// Helper: fetch wrapper
 async function ytFetch(path, params = {}) {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) throw new Error('Missing YOUTUBE_API_KEY env var');
-  params.key = apiKey;
-  const qs = new URLSearchParams(params).toString();
-  const url = `${API_BASE}/${path}?${qs}`;
-  const res = await fetch(url);
+  const url = new URL(`${YT}/${path}`);
+  url.searchParams.set('key', API_KEY);
+  for (const k of Object.keys(params)) {
+    if (params[k] !== undefined && params[k] !== null) url.searchParams.set(k, params[k]);
+  }
+  const res = await fetch(url.toString());
   if (!res.ok) {
     const txt = await res.text().catch(()=>null);
     const err = new Error(`YouTube API error ${res.status}: ${txt || res.statusText}`);
-    err.status = res.status; err.body = txt;
+    err.status = res.status;
     throw err;
   }
   return res.json();
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin','*');
-  res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+// Map playlistItems -> simplified video object
+function mapPlaylistItemToVideo(item) {
+  // item.snippet.resourceId.videoId
+  const snippet = item.snippet || {};
+  const resource = snippet.resourceId || {};
+  const vid = resource.videoId || snippet.videoId || (item.id && item.id.videoId) || null;
+  const thumbnails = snippet.thumbnails || {};
+  const thumb = (thumbnails.maxres && thumbnails.maxres.url) ||
+                (thumbnails.high && thumbnails.high.url) ||
+                (thumbnails.medium && thumbnails.medium.url) ||
+                (thumbnails.default && thumbnails.default.url) ||
+                null;
+  return {
+    id: vid,
+    title: snippet.title || '',
+    description: snippet.description || '',
+    thumbnail: thumb,
+    publishedAt: snippet.publishedAt || null,
+  };
+}
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
+// Map searchItem -> simplified video object
+function mapSearchItemToVideo(item) {
+  const idObj = item.id || {};
+  const vid = idObj.videoId || (item.snippet && item.snippet.resourceId && item.snippet.resourceId.videoId) || null;
+  const thumbnails = (item.snippet && item.snippet.thumbnails) || {};
+  const thumb = (thumbnails.high && thumbnails.high.url) ||
+                (thumbnails.medium && thumbnails.medium.url) ||
+                (thumbnails.default && thumbnails.default.url) || null;
+  return {
+    id: vid,
+    title: item.snippet ? item.snippet.title : '',
+    description: item.snippet ? item.snippet.description : '',
+    thumbnail: thumb,
+    publishedAt: item.snippet ? item.snippet.publishedAt : null,
+  };
+}
 
+// Get uploads playlist id for channel
+async function getUploadsPlaylistId(channelId) {
+  // channels.list part=contentDetails
+  const data = await ytFetch('channels', { part: 'contentDetails', id: channelId });
+  if (!data || !data.items || !data.items.length) return null;
+  const uploads = data.items[0].contentDetails.relatedPlaylists.uploads;
+  return uploads || null;
+}
+
+// CORS-safe JSON response
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    }
+  });
+}
+
+// Main handler (Vercel compatible)
+// Vercel Serverless supports both default export function (for Node) and edge functions (different signature).
+// This file uses the fetch handler signature so it can be used as an Edge function or normal serverless endpoint.
+// If your project uses the older Node style (module.exports), Vercel still accepts this signature.
+export default async function handler(req) {
   try {
-    const action = (req.query.action || 'uploads').toString();
-    const rawChannel = (req.query.channelId || '@radioefectopositivo').toString();
-    const channelParam = rawChannel.replace(/^@/,'');
-    const page = Math.max(1, Number(req.query.page || 1));
-    const pageSize = Math.min(50, Number(req.query.pageSize || 10));
-    const q = req.query.q ? String(req.query.q) : '';
-    const order = (req.query.order || 'date_desc').toString(); // date_desc | date_asc
-    const MAX_FETCH_ALL = Number(process.env.YT_MAX_FETCH_ALL || 500);
-
-    const cacheKey = JSON.stringify({ action, channelParam, page, pageSize, q, order });
-    const cached = cacheGet(cacheKey);
-    if (cached) { res.setHeader('x-cache','HIT'); return res.status(200).json(cached); }
-
-    // resolve channelId
-    async function resolveChannelId(param) {
-      if (/^UC[a-zA-Z0-9_-]{20,}$/.test(param)) return param;
-      const s = await ytFetch('search', { part: 'snippet', type: 'channel', q: param, maxResults: 1 });
-      if (s.items && s.items[0] && s.items[0].id && s.items[0].id.channelId) return s.items[0].id.channelId;
-      const c = await ytFetch('channels', { part: 'id', forUsername: param });
-      if (c.items && c.items[0] && c.items[0].id) return c.items[0].id;
-      return null;
+    // CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type'
+        }
+      });
     }
 
-    const channelId = await resolveChannelId(channelParam);
-    if (!channelId) return res.status(404).json({ error: 'Channel not found' });
+    const url = new URL(req.url);
+    const params = url.searchParams;
+    const action = params.get('action') || 'uploads';
+    const channelId = params.get('channelId') || DEFAULT_CHANNEL;
+    const pageSize = Math.min(50, Number(params.get('pageSize') || 10)); // YouTube max 50
+    const pageToken = params.get('pageToken') || undefined;
+    const playlistId = params.get('playlistId') || undefined;
+    const q = params.get('q') || undefined;
+    const order = params.get('order') || 'date'; // for search
+    const detectLive = params.get('detectLive') === '1' || params.get('detectLive') === 'true';
 
-    const result = { channelId };
+    if (!API_KEY) {
+      return jsonResponse({ error: 'YT API key not configured (env YT_API_KEY)' }, 500);
+    }
 
-    // ---- playlists list (tabs) ----
+    // --- ACTION: playlists ---
     if (action === 'playlists') {
-      const p = await ytFetch('playlists', { part: 'snippet,contentDetails', channelId, maxResults: 50 });
-      result.playlists = (p.items || []).map(pl => ({
-        id: pl.id,
-        title: pl.snippet.title,
-        count: pl.contentDetails?.itemCount || 0,
-        thumbnail: pl.snippet.thumbnails?.medium?.url
+      if (!channelId) return jsonResponse({ error: 'channelId required' }, 400);
+      const limit = Math.min(50, Number(params.get('limit') || 50));
+      const data = await ytFetch('playlists', { part: 'snippet,contentDetails', channelId, maxResults: limit.toString() });
+      const playlists = (data.items || []).map(p => ({
+        id: p.id,
+        title: (p.snippet && p.snippet.title) || '',
+        count: (p.contentDetails && p.contentDetails.itemCount) || 0
       }));
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
+      return jsonResponse({ playlists });
     }
 
-    // ---- playlistVideos (paged) ----
+    // --- ACTION: playlistVideos ---
     if (action === 'playlistVideos') {
-      const playlistId = req.query.playlistId;
-      if (!playlistId) return res.status(400).json({ error: 'playlistId required' });
-
-      // get playlist item count if possible
-      const plMeta = await ytFetch('playlists', { part: 'contentDetails,snippet', id: playlistId, maxResults: 1 });
-      const total = plMeta.items?.[0]?.contentDetails?.itemCount || null;
-      // if order desc -> use pageTokens caching strategy
-      if (order === 'date_desc') {
-        // key for page tokens cache
-        const pk = `pt:playlist:${playlistId}:desc:${pageSize}`;
-        if (!PAGE_TOKENS[pk] || PAGE_TOKENS[pk].expiry <= nowMs()) PAGE_TOKENS[pk] = { tokens: [''], expiry: nowMs() + DEFAULT_TTL };
-
-        // ensure tokens array up to requested page
-        while (PAGE_TOKENS[pk].tokens.length < page) {
-          const tokenForPrev = PAGE_TOKENS[pk].tokens[PAGE_TOKENS[pk].tokens.length - 1];
-          const resp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: pageSize, pageToken: tokenForPrev });
-          // store next token (may be undefined/null means no more)
-          PAGE_TOKENS[pk].tokens.push(resp.nextPageToken || null);
-          if (!resp.nextPageToken) break; // no more pages
-        }
-
-        // token to request is tokens[page-1]
-        const tokenToUse = PAGE_TOKENS[pk].tokens[page-1] || '';
-        const pageResp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: pageSize, pageToken: tokenToUse });
-        result.videos = (pageResp.items || []).map(it => ({
-          id: it.snippet.resourceId?.videoId,
-          title: it.snippet.title,
-          description: it.snippet.description,
-          thumbnail: it.snippet.thumbnails?.medium?.url,
-          publishedAt: it.snippet.publishedAt
-        }));
-        // determine pageCount if total known
-        if (total) result.pageCount = Math.ceil(total / pageSize);
-        // if nextPageToken exists -> indicate there is a next page
-        if (pageResp.nextPageToken) result.nextPage = page + 1;
-      } else {
-        // date_asc -> collect up to MAX_FETCH_ALL, reverse, slice
-        let all = [];
-        let next = '';
-        do {
-          const j = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: 50, pageToken: next });
-          (j.items || []).forEach(it => {
-            all.push({
-              id: it.snippet.resourceId?.videoId,
-              title: it.snippet.title,
-              description: it.snippet.description,
-              thumbnail: it.snippet.thumbnails?.medium?.url,
-              publishedAt: it.snippet.publishedAt
-            });
-          });
-          next = j.nextPageToken || '';
-          if (all.length >= MAX_FETCH_ALL) break;
-        } while (next);
-        all = all.slice(0, MAX_FETCH_ALL).reverse(); // oldest first
-        const start = (page - 1) * pageSize;
-        const slice = all.slice(start, start + pageSize);
-        result.videos = slice;
-        result.pageCount = Math.ceil(all.length / pageSize);
-        if (start + slice.length < all.length) result.nextPage = page + 1;
-      }
-
-      result.page = page;
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
+      if (!playlistId) return jsonResponse({ error: 'playlistId required' }, 400);
+      const data = await ytFetch('playlistItems', {
+        part: 'snippet,contentDetails',
+        playlistId,
+        maxResults: pageSize.toString(),
+        pageToken
+      });
+      const videos = (data.items || []).map(mapPlaylistItemToVideo).filter(v => v.id);
+      return jsonResponse({
+        videos,
+        pageToken: data.nextPageToken || null,
+        prevPageToken: data.prevPageToken || null,
+        totalResults: data.pageInfo ? data.pageInfo.totalResults : null
+      });
     }
 
-    // ---- uploads (todos los videos del canal paginados por page) ----
+    // --- ACTION: uploads (videos from channel uploads playlist) ---
     if (action === 'uploads') {
-      const ch = await ytFetch('channels', { part: 'contentDetails', id: channelId });
-      const uploads = ch.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-      if (!uploads) return res.status(500).json({ error: 'Uploads playlist not found' });
-
-      if (order === 'date_desc') {
-        // pageTokens caching similar to playlist
-        const pk = `pt:uploads:${channelId}:desc:${pageSize}`;
-        if (!PAGE_TOKENS[pk] || PAGE_TOKENS[pk].expiry <= nowMs()) PAGE_TOKENS[pk] = { tokens: [''], expiry: nowMs() + DEFAULT_TTL };
-
-        // ensure we have tokens up to requested page
-        while (PAGE_TOKENS[pk].tokens.length < page) {
-          const tokenForPrev = PAGE_TOKENS[pk].tokens[PAGE_TOKENS[pk].tokens.length - 1];
-          const resp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId: uploads, maxResults: pageSize, pageToken: tokenForPrev });
-          PAGE_TOKENS[pk].tokens.push(resp.nextPageToken || null);
-          if (!resp.nextPageToken) break;
-        }
-        const tokenToUse = PAGE_TOKENS[pk].tokens[page-1] || '';
-        const pageResp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId: uploads, maxResults: pageSize, pageToken: tokenToUse });
-        result.videos = (pageResp.items || []).map(it => ({
-          id: it.snippet.resourceId?.videoId,
-          title: it.snippet.title,
-          description: it.snippet.description,
-          thumbnail: it.snippet.thumbnails?.medium?.url,
-          publishedAt: it.snippet.publishedAt
-        }));
-        // total unknown for uploads; we don't set pageCount reliably
-        if (pageResp.nextPageToken) result.nextPage = page + 1;
-      } else {
-        // date_asc: collect up to MAX_FETCH_ALL then reverse and slice
-        let all = [];
-        let next = '';
-        do {
-          const j = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId: uploads, maxResults: 50, pageToken: next });
-          (j.items || []).forEach(it => {
-            all.push({
-              id: it.snippet.resourceId?.videoId,
-              title: it.snippet.title,
-              description: it.snippet.description,
-              thumbnail: it.snippet.thumbnails?.medium?.url,
-              publishedAt: it.snippet.publishedAt
-            });
-          });
-          next = j.nextPageToken || '';
-          if (all.length >= MAX_FETCH_ALL) break;
-        } while (next);
-        all = all.slice(0, MAX_FETCH_ALL).reverse();
-        const start = (page - 1) * pageSize;
-        const slice = all.slice(start, start + pageSize);
-        result.videos = slice;
-        result.pageCount = Math.ceil(all.length / pageSize);
-        if (start + slice.length < all.length) result.nextPage = page + 1;
-      }
-
-      result.page = page;
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
+      if (!channelId) return jsonResponse({ error: 'channelId required' }, 400);
+      const uploadsId = await getUploadsPlaylistId(channelId);
+      if (!uploadsId) return jsonResponse({ videos: [], message: 'No uploads playlist found' });
+      const data = await ytFetch('playlistItems', {
+        part: 'snippet,contentDetails',
+        playlistId: uploadsId,
+        maxResults: pageSize.toString(),
+        pageToken
+      });
+      const videos = (data.items || []).map(mapPlaylistItemToVideo).filter(v => v.id);
+      return jsonResponse({
+        videos,
+        pageToken: data.nextPageToken || null,
+        prevPageToken: data.prevPageToken || null,
+        totalResults: data.pageInfo ? data.pageInfo.totalResults : null
+      });
     }
 
-    // ---- search (simple: pageToken string prev/next) ----
+    // --- ACTION: search (channel-scoped) ---
     if (action === 'search') {
-      if (!q) return res.status(400).json({ error: 'q parameter required' });
-      const data = await ytFetch('search', { part: 'snippet', channelId, q, type: 'video', maxResults: pageSize, pageToken: req.query.pageToken || '' });
-      result.videos = (data.items || []).map(it => ({
-        id: it.id.videoId,
-        title: it.snippet.title,
-        description: it.snippet.description,
-        thumbnail: it.snippet.thumbnails?.medium?.url,
-        publishedAt: it.snippet.publishedAt
-      }));
-      if (data.nextPageToken) result.nextPage = 'next';
-      if (req.query.pageToken) result.prevPage = 'prev';
-      // simple server-side ordering within page
-      if (order === 'date_asc') result.videos = result.videos.slice().sort((a,b)=> new Date(a.publishedAt) - new Date(b.publishedAt));
-      else result.videos = result.videos.slice().sort((a,b)=> new Date(b.publishedAt) - new Date(a.publishedAt));
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
+      if (!channelId) return jsonResponse({ error: 'channelId required' }, 400);
+      if (!q) return jsonResponse({ error: 'q (query) is required for search' }, 400);
+      const data = await ytFetch('search', {
+        part: 'snippet',
+        q,
+        channelId,
+        order,
+        type: 'video',
+        maxResults: pageSize.toString(),
+        pageToken
+      });
+      const videos = (data.items || []).map(mapSearchItemToVideo).filter(v => v.id);
+      return jsonResponse({
+        videos,
+        pageToken: data.nextPageToken || null,
+        totalResults: data.pageInfo ? data.pageInfo.totalResults : null
+      });
     }
 
-    // ---- live ----
+    // --- ACTION: live (detect active live video for channel) ---
     if (action === 'live') {
-      const data = await ytFetch('search', { part: 'snippet', channelId, eventType: 'live', type: 'video', maxResults: 1 });
-      if (data.items && data.items[0]) {
-        const it = data.items[0];
-        result.live = { id: it.id.videoId, title: it.snippet.title, thumbnail: it.snippet.thumbnails?.medium?.url };
-      } else result.live = null;
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
+      if (!channelId) return jsonResponse({ error: 'channelId required' }, 400);
+      // search for live event in channel
+      try {
+        const liveData = await ytFetch('search', {
+          part: 'snippet',
+          channelId,
+          eventType: 'live',
+          type: 'video',
+          maxResults: '1'
+        });
+        if (liveData && liveData.items && liveData.items.length) {
+          const it = liveData.items[0];
+          const vid = (it.id && it.id.videoId) || null;
+          const title = (it.snippet && it.snippet.title) || '';
+          const urlVideo = vid ? `https://www.youtube.com/watch?v=${vid}` : null;
+          return jsonResponse({ live: vid ? { id: vid, title, url: urlVideo } : null });
+        } else {
+          return jsonResponse({ live: null });
+        }
+      } catch(e) {
+        // if search fails, return null (non-fatal)
+        return jsonResponse({ live: null });
+      }
     }
 
-    return res.status(400).json({ error: 'Unknown action' });
-
+    // default: return helpful message
+    return jsonResponse({
+      message: 'YouTube API proxy endpoint',
+      actions: ['playlists', 'playlistVideos', 'uploads', 'search', 'live'],
+      notes: 'Set YT_API_KEY env var in Vercel. Use ?action=uploads&channelId=... or action=playlists&channelId=...'
+    });
   } catch (err) {
-    console.error('api/youtube error', err && (err.message || err.body || err));
-    const status = err.status && Number(err.status) ? err.status : 500;
-    return res.status(status).json({ error: 'Error interno', details: String(err.message || err.body || err) });
+    console.error('youtube api error', err);
+    return jsonResponse({ error: err.message || String(err) }, err.status || 500);
   }
 }
