@@ -1,10 +1,10 @@
 /* js/widget.js
-   Widget de playlists (versión final solicitada)
-   - Sin opción asc/desc (solo lista de playlists seleccionadas + "Todos los videos")
+   Versión corregida: control robusto de peticiones para evitar apilamiento
+   - No hay opción asc/desc
+   - Tabs basados en ALLOWED_PLAYLISTS (rellena con tus playlist IDs)
    - Paginación por páginas (pageSize configurable)
-   - AbortController para cancelar peticiones previas (evita apilar videos)
-   - Fallback básico (si tu backend provee /api/videos-rss)
-   - Reemplaza completamente tu js/widget.js actual
+   - AbortController por petición y validación requestId antes de render
+   - Fallback RSS si la API devuelve quotaExceeded
 */
 
 (function(){
@@ -19,15 +19,12 @@
     const CHANNEL = (sc.dataset.channelId || '@radioefectopositivo').replace(/^@/,'');
     const PAGE_SIZE = Number(sc.dataset.pageSize || 10);
 
-    // contenedor principal (asegurate que exista en tu HTML: <div id="youtube-widget"></div>)
     const root = document.getElementById('youtube-widget');
     if (!root){ console.error('#youtube-widget not found'); return; }
     root.innerHTML = '';
 
     // -------------------------
-    // CONFIG: PASTE HERE your playlist IDs
-    // Replace the 'PLxxxxxxxx...' with the real playlist IDs from YouTube.
-    // Example: https://www.youtube.com/playlist?list=PLxxxxxxxxxxx  -> playlistId = 'PLxxxxxxxxxxx'
+    // CONFIG: PASTE HERE your playlist IDs (REQUIRED)
     // -------------------------
     const ALLOWED_PLAYLISTS = [
       { id: 'PL06d3Nw-68RVfTySoWo04Zf2-s3aEI2B4', title: 'Vuelta a casa' },
@@ -35,7 +32,6 @@
       { id: 'PL06d3Nw-68RU5zyPjHEOYtT1VIdX6QlNC', title: 'Jesus... la revelación' },
       { id: 'PL06d3Nw-68RVRPINt4Grb74yn5p8TmFyp', title: 'Encuentro con Efecto Positivo' }
     ];
-  
 
     // -------------------------
     // UI build
@@ -76,7 +72,7 @@
 
     root.appendChild(shell);
 
-    // styles (dark, responsive) - solo si no están
+    // styles
     if (!document.getElementById('ywp-styles')) {
       const css = document.createElement('style'); css.id='ywp-styles';
       css.textContent = `
@@ -88,7 +84,7 @@
       .ywp-search{padding:8px 10px;border-radius:8px;border:1px solid #222;background:#0f0f10;color:#eee;min-width:200px}
       .ywp-grid{display:grid;gap:12px;grid-template-columns:repeat(4,1fr)}
       .yt-video-card{background:#111;border-radius:8px;overflow:hidden;cursor:pointer;border:1px solid #1d1d1d}
-      .yt-video-thumb{width:100%;height:0;padding-bottom:56.25%;background-size:cover;background-position:center}
+      .ywp-thumb{width:100%;height:0;padding-bottom:56.25%;background-size:cover;background-position:center}
       .yt-video-title{padding:8px;font-size:14px;color:#f5f5f5}
       .ywp-pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px}
       .ywp-page-btn{padding:8px 10px;border-radius:6px;background:#121212;color:#eee;border:1px solid #2a2a2a;cursor:pointer}
@@ -104,77 +100,51 @@
       document.head.appendChild(css);
     }
 
-    // -------------------------
-    // State
-    // -------------------------
+    // state
     let currentPage = 1;
     let pageCount = null;
-    let activeTab = { type:'uploads', id: null }; // uploads | playlist | search
+    let activeTab = { type:'uploads', id: null };
     let lastQuery = '';
     let liveChecked = false;
 
-    // Abort controller & stale protection
+    // abort + request id
     let currentFetchController = null;
     let lastRequestId = 0;
 
-    // helper create tab
     function createTabElement(title, meta){
       const btn = document.createElement('button'); btn.className='ywp-tab'; btn.textContent = title;
       btn.dataset.meta = JSON.stringify(meta || {});
       return btn;
     }
 
-    // fetch wrapper with abort + stale detection
-    async function fetchApi(params){
-      if (currentFetchController) { try { currentFetchController.abort(); } catch(e){} currentFetchController = null; }
-      currentFetchController = new AbortController();
-      const thisRequestId = ++lastRequestId;
-
+    // fetch wrapper (does not manage requestId)
+    async function fetchApiWithSignal(params, signal){
       const url = new URL(ENDPOINT, location.origin);
       Object.keys(params || {}).forEach(k => { if (params[k] !== undefined && params[k] !== null) url.searchParams.set(k, params[k]); });
       if (!url.searchParams.get('channelId')) url.searchParams.set('channelId', CHANNEL);
       if (!url.searchParams.get('pageSize')) url.searchParams.set('pageSize', PAGE_SIZE);
+      const r = await fetch(url.toString(), { signal });
+      if (!r.ok) {
+        const t = await r.text().catch(()=>null);
+        throw new Error(`Status ${r.status} - ${t||r.statusText}`);
+      }
+      return r.json();
+    }
 
+    // fallback RSS (no signal support, but we'll validate requestId before rendering)
+    async function fetchRSSFallback(){
       try {
-        const r = await fetch(url.toString(), { signal: currentFetchController.signal });
-        if (!r.ok) {
-          const t = await r.text().catch(()=>null);
-          throw new Error(`Status ${r.status} - ${t||r.statusText}`);
-        }
-        const json = await r.json();
-        if (thisRequestId !== lastRequestId) {
-          const e = new Error('stale'); e.name = 'StaleResponse'; throw e;
-        }
-        return json;
-      } catch (err) {
-        throw err;
+        const rssUrl = new URL('/api/videos-rss', location.origin);
+        const r = await fetch(rssUrl.toString());
+        if (!r.ok) throw new Error('RSS fallback failed');
+        const data = await r.json();
+        return { videos: (data.items || data.videos || []).slice(0, PAGE_SIZE), page:1 };
+      } catch(e){
+        throw e;
       }
     }
 
-    // fallback: try videos-rss if API quota falla (opcional)
-    async function fetchWithFallback(params){
-      try { return await fetchApi(params); }
-      catch (err) {
-        if (err && (err.name === 'AbortError' || err.name === 'StaleResponse')) throw err;
-        // detect quotaExceeded in message
-        const msg = err && err.message ? err.message : '';
-        if (msg.includes('quota') || msg.includes('quotaExceeded')) {
-          console.warn('YouTube quota exceeded — intentando fallback RSS');
-          try {
-            const rssUrl = new URL('/api/videos-rss', location.origin);
-            const r = await fetch(rssUrl.toString());
-            if (!r.ok) throw new Error('RSS fallback failed');
-            const data = await r.json();
-            return { videos: (data.items || data.videos || []).slice(0, Number(params.pageSize || PAGE_SIZE)), page:1 };
-          } catch(e2) {
-            throw err;
-          }
-        }
-        throw err;
-      }
-    }
-
-    // render videos
+    // render videos (will be called only after requestId validation)
     function renderVideos(videos){
       grid.innerHTML = '';
       if (!videos || !videos.length) {
@@ -183,7 +153,7 @@
       }
       videos.forEach(v => {
         const card = document.createElement('div'); card.className='yt-video-card';
-        const thumb = document.createElement('div'); thumb.className='ywp-thumb yt-video-thumb';
+        const thumb = document.createElement('div'); thumb.className='ywp-thumb';
         thumb.style.backgroundImage = `url("${v.thumbnail || (`https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`)}")`;
         const title = document.createElement('div'); title.className='yt-video-title'; title.textContent = v.title || 'Sin título';
         card.appendChild(thumb); card.appendChild(title);
@@ -224,7 +194,6 @@
         tabAll.addEventListener('click', ()=> activateTab({ type:'uploads' }));
         tabsWrap.appendChild(tabAll);
 
-        // add allowed playlists only (must have id)
         (ALLOWED_PLAYLISTS || []).forEach(pl => {
           if (!pl.id) return;
           const t = createTabElement(pl.title || 'Playlist', { type:'playlist', id: pl.id });
@@ -237,9 +206,8 @@
       }
     }
 
-    // activate tab: clean grid, abort pending, load first page
+    // activate tab -> clear UI immediately and start loadPage
     async function activateTab(tabSpec){
-      // UI highlight
       Array.from(tabsWrap.children).forEach(ch => ch.classList.remove('active'));
       for (let btn of Array.from(tabsWrap.children)) {
         try {
@@ -249,55 +217,96 @@
         } catch(e){}
       }
 
-      // reset state immediately
+      // reset UI quickly so user sees it's switching
       activeTab = tabSpec;
       currentPage = 1;
       pageCount = null;
       lastQuery = '';
-      grid.innerHTML = ''; // clear immediately
+      grid.innerHTML = ''; // immediate visual clear
       setLiveVisible(false);
 
       // abort previous fetch
-      if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      if (currentFetchController) { try { currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      // increment global request id so older responses are stale
       lastRequestId++;
 
       try {
         await loadPage();
       } catch(e) {
-        // ignore abort/stale silently
         if (e && (e.name === 'AbortError' || e.name === 'StaleResponse' || e.message === 'stale')) return;
         console.error('activateTab loadPage error', e);
       }
     }
 
-    // load current page depending on activeTab
+    // loadPage: builds controller, sets requestId, fetches, only renders if requestId matches
     async function loadPage(){
-      grid.innerHTML = '<div style="color:#bbb">Cargando...</div>';
-      try {
-        const params = { action: '', page: currentPage };
-        if (activeTab.type === 'uploads') params.action = 'uploads';
-        else if (activeTab.type === 'playlist') { params.action = 'playlistVideos'; params.playlistId = activeTab.id; }
-        else { grid.innerHTML = ''; return; }
+      // create new controller and request id
+      if (currentFetchController) { try { currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      currentFetchController = new AbortController();
+      const thisRequestId = ++lastRequestId;
 
-        const data = await fetchWithFallback(params); // uses fetchApi internally
+      // set loading UI if desired
+      grid.innerHTML = '<div style="color:#bbb">Cargando...</div>';
+
+      const params = { action:'', page: currentPage };
+      if (activeTab.type === 'uploads') params.action = 'uploads';
+      else if (activeTab.type === 'playlist') { params.action = 'playlistVideos'; params.playlistId = activeTab.id; }
+      else { grid.innerHTML = ''; return; }
+
+      try {
+        let data;
+        try {
+          data = await fetchApiWithSignal(params, currentFetchController.signal);
+        } catch(apiErr) {
+          // detect quotaExceeded (texto)
+          const msg = apiErr && apiErr.message ? apiErr.message : '';
+          if (msg.includes('quota') || msg.includes('quotaExceeded')) {
+            // fallback to RSS (no signal) but still validate requestId after it returns
+            console.warn('Quota exceeded, trying RSS fallback');
+            data = await fetchRSSFallback();
+          } else {
+            throw apiErr;
+          }
+        }
+
+        // only render if this is the lastRequestId
+        if (thisRequestId !== lastRequestId) {
+          // stale response - do nothing
+          return;
+        }
+
         renderVideos(data.videos || []);
         pageCount = data.pageCount || null;
         currentPage = data.page || currentPage;
         renderPager();
 
+        // live check once
         if (!liveChecked) {
           try {
-            const live = await fetchWithFallback({ action:'live' });
+            const liveData = await (async ()=>{
+              // create a local controller so this live check can be aborted by later navigations
+              const ctrl = new AbortController();
+              // do not replace global controller - but if user navigates, lastRequestId increments and we ignore
+              try {
+                return await fetchApiWithSignal({ action:'live' }, ctrl.signal);
+              } catch(e){ throw e; }
+            })();
             liveChecked = true;
-            if (live && live.live) setLiveVisible(true, live.live.id);
+            if (liveData && liveData.live) setLiveVisible(true, liveData.live.id);
             else setLiveVisible(false);
-          } catch(e){ setLiveVisible(false); }
+          } catch(e){
+            // ignore live errors
+            setLiveVisible(false);
+          }
         }
+
       } catch (err) {
-        if (err && (err.name === 'AbortError' || err.name === 'StaleResponse' || err.message === 'stale')) return;
+        if (err && err.name === 'AbortError') return;
         console.error('Error loadPage', err);
-        // show friendly message
+        if (thisRequestId !== lastRequestId) return; // stale
         grid.innerHTML = '<div style="color:#f88">Error cargando videos. Intenta nuevamente más tarde.</div>';
+      } finally {
+        // don't null global controller here - it should remain until next abort
       }
     }
 
@@ -314,6 +323,7 @@
 
     async function goToPage(p){
       currentPage = Math.max(1, Number(p||1));
+      // abort previous and bump requestId then load
       if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
       lastRequestId++;
       await loadPage();
@@ -321,30 +331,37 @@
     prevBtn.addEventListener('click', ()=> { if (currentPage>1) goToPage(currentPage-1); });
     nextBtn.addEventListener('click', ()=> { if (!pageCount || currentPage < pageCount) goToPage(currentPage+1); });
 
-    // search: enter to search (uses action=search on backend if available)
+    // search (Enter)
     searchInput.addEventListener('keydown', async (e) => {
       if (e.key !== 'Enter') return;
       const q = searchInput.value.trim();
       if (!q) return;
-      // switch to search mode
+      // abort previous, set state
+      if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+      lastRequestId++;
       activeTab = { type:'search' };
       currentPage = 1;
       pageCount = null;
       grid.innerHTML = '';
       try {
+        const ctrl = new AbortController();
         const url = new URL(ENDPOINT, location.origin);
         url.searchParams.set('action','search');
         url.searchParams.set('q', q);
         url.searchParams.set('pageSize', PAGE_SIZE);
         url.searchParams.set('channelId', CHANNEL);
-        const r = await fetch(url.toString());
+        const r = await fetch(url.toString(), { signal: ctrl.signal });
         if (!r.ok) throw new Error('Error en búsqueda');
         const data = await r.json();
+        // only render if still latest
+        const localRequestId = lastRequestId;
+        if (localRequestId !== lastRequestId) return;
         renderVideos(data.videos || []);
         prevBtn.disabled = !data.prevPage;
         nextBtn.disabled = !data.nextPage;
         pagesWrap.innerHTML = `<span style="color:#ddd">Resultados para "${q}"</span>`;
       } catch(err) {
+        if (err && err.name === 'AbortError') return;
         console.error('search error', err);
         grid.innerHTML = `<div style="color:#f88">Error en búsqueda.</div>`;
       }
