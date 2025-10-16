@@ -40,7 +40,7 @@
     const header = document.createElement('div'); header.className='ywp-header';
     const tabsWrap = document.createElement('div'); tabsWrap.className='ywp-tabs';
     const searchWrap = document.createElement('div'); searchWrap.className='ywp-search-wrap';
-    const searchInput = document.createElement('input'); searchInput.type='search'; searchInput.placeholder='Buscar...'; searchInput.className='ywp-search';
+    const searchInput = document.createElement('input'); searchInput.type='search'; searchInput.placeholder='Buscar...'; searchInput.className='ywp-search'; searchInput.id = 'ywp-search-input'; searchInput.name = 'ywp-search';
     searchWrap.appendChild(searchInput);
 
     const liveWrap = document.createElement('div'); liveWrap.className='ywp-live-wrap';
@@ -206,7 +206,9 @@
       }
     }
 
-    // activate tab -> clear UI immediately and start loadPage
+    // --- Reemplazar activateTab y loadPage por estas versiones ---
+    let globalRenderToken = null; // token global para validar renderizaciones
+
     async function activateTab(tabSpec){
       Array.from(tabsWrap.children).forEach(ch => ch.classList.remove('active'));
       for (let btn of Array.from(tabsWrap.children)) {
@@ -217,98 +219,95 @@
         } catch(e){}
       }
 
-      // reset UI quickly so user sees it's switching
-      activeTab = tabSpec;
-      currentPage = 1;
-      pageCount = null;
-      lastQuery = '';
-      grid.innerHTML = ''; // immediate visual clear
-      setLiveVisible(false);
+    // reset UI
+    activeTab = tabSpec;
+    currentPage = 1;
+    pageCount = null;
+    lastQuery = '';
+    grid.innerHTML = ''; // clear immediately
+    setLiveVisible(false);
 
-      // abort previous fetch
-      if (currentFetchController) { try { currentFetchController.abort(); } catch(e){} currentFetchController = null; }
-      // increment global request id so older responses are stale
-      lastRequestId++;
+    // abort previous fetch and bump request id / token
+    if (currentFetchController) { try{ currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+    lastRequestId++;
+    // new global token for this navigation
+    globalRenderToken = Symbol('render');
 
-      try {
-        await loadPage();
-      } catch(e) {
-        if (e && (e.name === 'AbortError' || e.name === 'StaleResponse' || e.message === 'stale')) return;
-        console.error('activateTab loadPage error', e);
+    try {
+      await loadPage(globalRenderToken);
+    } catch(e) {
+    if (e && (e.name === 'AbortError' || e.name === 'StaleResponse' || e.message === 'stale')) return;
+      console.error('activateTab loadPage error', e);
+    }
+  }
+
+  async function loadPage(renderToken){ // receive expected renderToken
+  // create controller + local token
+  if (currentFetchController) { try { currentFetchController.abort(); } catch(e){} currentFetchController = null; }
+  currentFetchController = new AbortController();
+  const localRequestId = ++lastRequestId;
+  const myToken = renderToken || Symbol('render_local');
+
+  // set a visual loading (but keep grid cleared)
+  grid.innerHTML = '<div style="color:#bbb">Cargando...</div>';
+
+  const params = { action:'', page: currentPage };
+  if (activeTab.type === 'uploads') params.action = 'uploads';
+  else if (activeTab.type === 'playlist') { params.action = 'playlistVideos'; params.playlistId = activeTab.id; }
+  else { grid.innerHTML = ''; return; }
+
+  try {
+    let data;
+    try {
+      data = await fetchApiWithSignal(params, currentFetchController.signal);
+    } catch(apiErr) {
+      const msg = apiErr && apiErr.message ? apiErr.message : '';
+      if (msg.includes('quota') || msg.includes('quotaExceeded')) {
+        console.warn('Quota exceeded -> trying RSS fallback');
+        data = await fetchRSSFallback(); // fallback returns { videos: [...] }
+      } else {
+        throw apiErr;
       }
     }
 
-    // loadPage: builds controller, sets requestId, fetches, only renders if requestId matches
-    async function loadPage(){
-      // create new controller and request id
-      if (currentFetchController) { try { currentFetchController.abort(); } catch(e){} currentFetchController = null; }
-      currentFetchController = new AbortController();
-      const thisRequestId = ++lastRequestId;
+    // VALIDACIÓN RÍGIDA: solo renderiza si token es el mismo que el global actual
+    if (globalRenderToken !== myToken) {
+      // respuesta vieja - ignorar
+      console.debug('Ignored stale response (different render token)');
+      return;
+    }
 
-      // set loading UI if desired
-      grid.innerHTML = '<div style="color:#bbb">Cargando...</div>';
+    // renderizar
+    renderVideos(data.videos || []);
+    pageCount = data.pageCount || null;
+    currentPage = data.page || currentPage;
+    renderPager();
 
-      const params = { action:'', page: currentPage };
-      if (activeTab.type === 'uploads') params.action = 'uploads';
-      else if (activeTab.type === 'playlist') { params.action = 'playlistVideos'; params.playlistId = activeTab.id; }
-      else { grid.innerHTML = ''; return; }
-
+    // live check (solo si este token sigue vigente)
+    if (!liveChecked) {
       try {
-        let data;
-        try {
-          data = await fetchApiWithSignal(params, currentFetchController.signal);
-        } catch(apiErr) {
-          // detect quotaExceeded (texto)
-          const msg = apiErr && apiErr.message ? apiErr.message : '';
-          if (msg.includes('quota') || msg.includes('quotaExceeded')) {
-            // fallback to RSS (no signal) but still validate requestId after it returns
-            console.warn('Quota exceeded, trying RSS fallback');
-            data = await fetchRSSFallback();
-          } else {
-            throw apiErr;
-          }
-        }
-
-        // only render if this is the lastRequestId
-        if (thisRequestId !== lastRequestId) {
-          // stale response - do nothing
-          return;
-        }
-
-        renderVideos(data.videos || []);
-        pageCount = data.pageCount || null;
-        currentPage = data.page || currentPage;
-        renderPager();
-
-        // live check once
-        if (!liveChecked) {
-          try {
-            const liveData = await (async ()=>{
-              // create a local controller so this live check can be aborted by later navigations
-              const ctrl = new AbortController();
-              // do not replace global controller - but if user navigates, lastRequestId increments and we ignore
-              try {
-                return await fetchApiWithSignal({ action:'live' }, ctrl.signal);
-              } catch(e){ throw e; }
-            })();
-            liveChecked = true;
-            if (liveData && liveData.live) setLiveVisible(true, liveData.live.id);
-            else setLiveVisible(false);
-          } catch(e){
-            // ignore live errors
-            setLiveVisible(false);
-          }
-        }
-
-      } catch (err) {
-        if (err && err.name === 'AbortError') return;
-        console.error('Error loadPage', err);
-        if (thisRequestId !== lastRequestId) return; // stale
-        grid.innerHTML = '<div style="color:#f88">Error cargando videos. Intenta nuevamente más tarde.</div>';
-      } finally {
-        // don't null global controller here - it should remain until next abort
+        if (globalRenderToken !== myToken) return;
+        const liveData = await (async ()=>{
+          const ctrl = new AbortController();
+          return await fetchApiWithSignal({ action:'live' }, ctrl.signal);
+        })();
+        if (globalRenderToken !== myToken) return;
+        liveChecked = true;
+        if (liveData && liveData.live) setLiveVisible(true, liveData.live.id);
+        else setLiveVisible(false);
+      } catch(e){
+        if (globalRenderToken === myToken) setLiveVisible(false);
       }
     }
+
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    console.error('Error loadPage', err);
+    if (globalRenderToken !== myToken) return;
+    grid.innerHTML = '<div style="color:#f88">Error cargando videos. Intenta nuevamente más tarde.</div>';
+  }
+}
+
 
     function setLiveVisible(show, videoId){
       if (show) {
