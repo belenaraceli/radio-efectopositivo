@@ -17,7 +17,7 @@
 
     const ENDPOINT = sc.dataset.endpoint || '/api/youtube';
     const CHANNEL = (sc.dataset.channelId || '@radioefectopositivo').replace(/^@/,'');
-    const PAGE_SIZE = Number(sc.dataset.pageSize || 10);
+    const PAGE_SIZE = Number(sc.dataset.pageSize || 12);
 
     const root = document.getElementById('youtube-widget');
     if (!root){ console.error('#youtube-widget not found'); return; }
@@ -78,7 +78,7 @@
       css.textContent = `
       .ywp-shell{background:#0b0b0c;color:#e6e6e6;padding:18px;border-radius:10px;max-width:1100px;margin:12px auto}
       .ywp-header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-      .ywp-tabs{display:flex;gap:6px;flex-wrap:wrap}
+      .ywp-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
       .ywp-tab{background:#111;border:1px solid #222;padding:8px 12px;border-radius:8px;color:#ddd;cursor:pointer}
       .ywp-tab.active{background:#222;border-color:#444;color:#fff;font-weight:600}
       .ywp-search{padding:8px 10px;border-radius:8px;border:1px solid #222;background:#0f0f10;color:#eee;min-width:200px}
