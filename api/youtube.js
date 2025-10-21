@@ -43,7 +43,11 @@ export default async function handler(req, res) {
     const order = (req.query.order || 'date_desc').toString(); // date_desc | date_asc
     const MAX_FETCH_ALL = Number(process.env.YT_MAX_FETCH_ALL || 500);
 
-    const cacheKey = JSON.stringify({ action, channelParam, page, pageSize, q, order });
+    // incluir playlistId / uploads identifier en la clave de cache para evitar colisiones
+    const rawPlaylistId = req.query.playlistId ? String(req.query.playlistId).trim() : null;
+    let uploadsPlaylistParam = null; // se rellenará más abajo si action === 'uploads'
+    const cacheKey = JSON.stringify({ action, channelParam, page, pageSize, q, order, playlistId: rawPlaylistId, uploadsPlaylistParam });
+
     const cached = cacheGet(cacheKey);
     if (cached) { res.setHeader('x-cache','HIT'); return res.status(200).json(cached); }
 
@@ -144,6 +148,8 @@ if (action === 'playlistVideos') {
     if (action === 'uploads') {
       const ch = await ytFetch('channels', { part: 'contentDetails', id: channelId });
       const uploads = ch.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+      // actualizar cache key con uploads playlist id (ayuda a evitar colisiones)
+      uploadsPlaylistParam = uploads || uploadsPlaylistParam;
       if (!uploads) return res.status(500).json({ error: 'Uploads playlist not found' });
 
       if (order === 'date_desc') {
