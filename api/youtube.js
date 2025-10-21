@@ -62,88 +62,83 @@ export default async function handler(req, res) {
 
     const result = { channelId };
 
-    // ---- playlists list (tabs) ----
-    if (action === 'playlists') {
-      const p = await ytFetch('playlists', { part: 'snippet,contentDetails', channelId, maxResults: 50 });
-      result.playlists = (p.items || []).map(pl => ({
-        id: pl.id,
-        title: pl.snippet.title,
-        count: pl.contentDetails?.itemCount || 0,
-        thumbnail: pl.snippet.thumbnails?.medium?.url
-      }));
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
+    // ---------- REEMPLAZAR la sección playlistVideos por este bloque ----------
+if (action === 'playlistVideos') {
+  // playlistId requerido
+  const playlistId = String(req.query.playlistId || '').trim();
+  if (!playlistId) return res.status(400).json({ error: 'playlistId required' });
+
+  // Intentar obtener conteo total (si disponible)
+  let total = null;
+  try {
+    const plMeta = await ytFetch('playlists', { part: 'contentDetails,snippet', id: playlistId, maxResults: 1 });
+    total = plMeta.items?.[0]?.contentDetails?.itemCount || null;
+  } catch (e) {
+    // no fatal: continuamos sin total
+    total = null;
+  }
+
+  // Si orden por fecha descendente -> usar pageTokens cacheados por playlistId
+  if (order === 'date_desc') {
+    const pk = `pt:playlist:${playlistId}:desc:${pageSize}`;
+    if (!PAGE_TOKENS[pk] || PAGE_TOKENS[pk].expiry <= nowMs()) PAGE_TOKENS[pk] = { tokens: [''], expiry: nowMs() + DEFAULT_TTL };
+
+    // construir tokens hasta la página solicitada (si aún no existen)
+    while (PAGE_TOKENS[pk].tokens.length < page) {
+      const prevToken = PAGE_TOKENS[pk].tokens[PAGE_TOKENS[pk].tokens.length - 1] || '';
+      const resp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: pageSize, pageToken: prevToken });
+      PAGE_TOKENS[pk].tokens.push(resp.nextPageToken || null);
+      if (!resp.nextPageToken) break;
     }
 
-    // ---- playlistVideos (paged) ----
-    if (action === 'playlistVideos') {
-      const playlistId = req.query.playlistId;
-      if (!playlistId) return res.status(400).json({ error: 'playlistId required' });
+    const tokenToUse = PAGE_TOKENS[pk].tokens[page-1] || '';
+    const pageResp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: pageSize, pageToken: tokenToUse });
+    result.videos = (pageResp.items || []).map(it => ({
+      id: it.snippet.resourceId?.videoId,
+      title: it.snippet.title,
+      description: it.snippet.description,
+      thumbnail: it.snippet.thumbnails?.medium?.url,
+      publishedAt: it.snippet.publishedAt
+    }));
+    if (total) result.pageCount = Math.ceil(total / pageSize);
+    if (pageResp.nextPageToken) result.nextPage = page + 1;
 
-      // get playlist item count if possible
-      const plMeta = await ytFetch('playlists', { part: 'contentDetails,snippet', id: playlistId, maxResults: 1 });
-      const total = plMeta.items?.[0]?.contentDetails?.itemCount || null;
-      // if order desc -> use pageTokens caching strategy
-      if (order === 'date_desc') {
-        // key for page tokens cache
-        const pk = `pt:playlist:${playlistId}:desc:${pageSize}`;
-        if (!PAGE_TOKENS[pk] || PAGE_TOKENS[pk].expiry <= nowMs()) PAGE_TOKENS[pk] = { tokens: [''], expiry: nowMs() + DEFAULT_TTL };
-
-        // ensure tokens array up to requested page
-        while (PAGE_TOKENS[pk].tokens.length < page) {
-          const tokenForPrev = PAGE_TOKENS[pk].tokens[PAGE_TOKENS[pk].tokens.length - 1];
-          const resp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: pageSize, pageToken: tokenForPrev });
-          // store next token (may be undefined/null means no more)
-          PAGE_TOKENS[pk].tokens.push(resp.nextPageToken || null);
-          if (!resp.nextPageToken) break; // no more pages
-        }
-
-        // token to request is tokens[page-1]
-        const tokenToUse = PAGE_TOKENS[pk].tokens[page-1] || '';
-        const pageResp = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: pageSize, pageToken: tokenToUse });
-        result.videos = (pageResp.items || []).map(it => ({
+    result.page = page;
+    cacheSet(cacheKey, result);
+    res.setHeader('x-cache','MISS');
+    return res.status(200).json(result);
+  } else {
+    // date_asc: recolectar hasta MAX_FETCH_ALL, invertir y slice
+    let all = [];
+    let next = '';
+    do {
+      const j = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: 50, pageToken: next });
+      (j.items || []).forEach(it => {
+        all.push({
           id: it.snippet.resourceId?.videoId,
           title: it.snippet.title,
           description: it.snippet.description,
           thumbnail: it.snippet.thumbnails?.medium?.url,
           publishedAt: it.snippet.publishedAt
-        }));
-        // determine pageCount if total known
-        if (total) result.pageCount = Math.ceil(total / pageSize);
-        // if nextPageToken exists -> indicate there is a next page
-        if (pageResp.nextPageToken) result.nextPage = page + 1;
-      } else {
-        // date_asc -> collect up to MAX_FETCH_ALL, reverse, slice
-        let all = [];
-        let next = '';
-        do {
-          const j = await ytFetch('playlistItems', { part: 'snippet,contentDetails', playlistId, maxResults: 50, pageToken: next });
-          (j.items || []).forEach(it => {
-            all.push({
-              id: it.snippet.resourceId?.videoId,
-              title: it.snippet.title,
-              description: it.snippet.description,
-              thumbnail: it.snippet.thumbnails?.medium?.url,
-              publishedAt: it.snippet.publishedAt
-            });
-          });
-          next = j.nextPageToken || '';
-          if (all.length >= MAX_FETCH_ALL) break;
-        } while (next);
-        all = all.slice(0, MAX_FETCH_ALL).reverse(); // oldest first
-        const start = (page - 1) * pageSize;
-        const slice = all.slice(start, start + pageSize);
-        result.videos = slice;
-        result.pageCount = Math.ceil(all.length / pageSize);
-        if (start + slice.length < all.length) result.nextPage = page + 1;
-      }
+        });
+      });
+      next = j.nextPageToken || '';
+      if (all.length >= MAX_FETCH_ALL) break;
+    } while (next);
+    all = all.slice(0, MAX_FETCH_ALL).reverse();
+    const start = (page - 1) * pageSize;
+    const slice = all.slice(start, start + pageSize);
+    result.videos = slice;
+    result.pageCount = Math.ceil(all.length / pageSize);
+    if (start + slice.length < all.length) result.nextPage = page + 1;
+    result.page = page;
+    cacheSet(cacheKey, result);
+    res.setHeader('x-cache','MISS');
+    return res.status(200).json(result);
+  }
+}
+// ---------- fin bloque ----------
 
-      result.page = page;
-      cacheSet(cacheKey, result);
-      res.setHeader('x-cache','MISS');
-      return res.status(200).json(result);
-    }
 
     // ---- uploads (todos los videos del canal paginados por page) ----
     if (action === 'uploads') {
