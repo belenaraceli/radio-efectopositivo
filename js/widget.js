@@ -66,7 +66,7 @@
     modal.innerHTML = `<div class="ywp-modal-content" role="dialog"><button class="ywp-modal-close">Cerrar ✖</button><iframe class="ywp-modal-iframe" src="" allowfullscreen></iframe></div>`;
     document.body.appendChild(modal);
     const modalIframe = modal.querySelector('.ywp-modal-iframe'); const modalClose = modal.querySelector('.ywp-modal-close');
-    function openModal(id){ modal.style.display='flex'; modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1`; }
+    function openModal(id){ modal.style.display='flex'; modalIframe.src = ''; modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0&modestbranding=1`; }
     function closeModal(){ modal.style.display='none'; modalIframe.src=''; }
     modalClose.addEventListener('click', closeModal); modal.addEventListener('click', (e)=>{ if(e.target===modal) closeModal(); });
 
@@ -93,9 +93,15 @@
       .ywp-live-btn{background:#e33;color:#fff;padding:8px 10px;border-radius:8px;border:0;cursor:pointer}
       @media(max-width:900px){ .ywp-grid{grid-template-columns:repeat(2,1fr)} }
       @media(max-width:560px){ .ywp-grid{grid-template-columns:repeat(1,1fr)} .ywp-search{min-width:140px} }
-      .ywp-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);z-index:9999}
-      .ywp-modal-content{width:90%;max-width:980px;aspect-ratio:16/9;background:#000;position:relative;border-radius:8px;overflow:hidden}
-      .ywp-modal-close{position:absolute;top:-40px;right:0;background:#fff;color:#111;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+      /* Modal — arreglar tamaño del iframe y botón cerrar */
+      .ywp-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);z-index:9999;padding: 20px; /* espacio alrededor para mobile */box-sizing: border-box;}
+      .ywp-modal-content{width:100%;max-width:1180px;background:#000;position:relative;border-radius:8px;overflow:hidden;/* usar relacion 16:9 pero permitir que el iframe llene completamente */aspect-ratio: 16 / 9;display:flex;}
+      .ywp-modal-iframe{border:0;width:100%;height:100%;display:block;}
+      .ywp-modal-close{position:absolute;top:10px;right:10px;background:rgba(255,255,255,0.95);color:#111;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;z-index: 2;font-weight:600;}
+      @media(max-width:760px){.ywp-modal-content{ width:100%; max-width:100%; border-radius:6px; }
+      .ywp-modal-close{ top:6px; right:6px; padding:5px 8px; }
+      }
+
       `;
       document.head.appendChild(css);
     }
