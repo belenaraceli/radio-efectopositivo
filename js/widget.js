@@ -76,8 +76,8 @@
     if (!document.getElementById('ywp-styles')) {
       const css = document.createElement('style'); css.id='ywp-styles';
       css.textContent = `
-      .ywp-shell{background:#0b0b0c;color:#e6e6e6;padding:18px;border-radius:10px;max-width:1100px;margin:12px auto}
-      .ywp-header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+      .ywp-shell{background:#0b0b0c70;color:#e6e6e6;padding:18px;border-radius:10px;max-width:1100px;margin:12px auto}
+      .ywp-header{display:flex;justify-content:center;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
       .ywp-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
       .ywp-tab{background:#111;border:1px solid #222;padding:8px 12px;border-radius:8px;color:#ddd;cursor:pointer}
       .ywp-tab.active{background:#222;border-color:#444;color:#fff;font-weight:600}
