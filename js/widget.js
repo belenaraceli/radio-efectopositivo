@@ -62,13 +62,20 @@
     pager.appendChild(prevBtn); pager.appendChild(pagesWrap); pager.appendChild(nextBtn);
     shell.appendChild(pager);
 
-    // --- Modal: creación y control (reemplazar bloque existente) ---
+// --- Modal: creación y control (sin autoplay; controles nativos habilitados) ---
 const modal = document.createElement('div');
 modal.className = 'ywp-modal';
 modal.innerHTML = `
   <div class="ywp-modal-content" role="dialog">
     <button class="ywp-modal-close" aria-label="Cerrar">Cerrar ✖</button>
-    <iframe class="ywp-modal-iframe" src="" frameborder="0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen playsinline></iframe>
+    <iframe class="ywp-modal-iframe"
+      src=""
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+      allowfullscreen
+      playsinline
+      referrerpolicy="no-referrer"
+    ></iframe>
   </div>
 `;
 document.body.appendChild(modal);
@@ -76,30 +83,36 @@ document.body.appendChild(modal);
 const modalIframe = modal.querySelector('.ywp-modal-iframe');
 const modalClose = modal.querySelector('.ywp-modal-close');
 
-// Asegurarse que el iframe no tenga src por defecto
+// asegurar src vacío
 modalIframe.src = '';
 
-// openModal y closeModal robustos
+// abrir modal SIN autoplay: el usuario usará los controles para play/pause
 function openModal(id){
-  // esto debe ejecutarse como resultado del click del usuario
   modal.style.display = 'flex';
-  // limpiar y luego setear src con autoplay silenciado y playsinline
-  modalIframe.src = '';
-  // builds src ensuring playsinline, muted (mejor compatibilidad movil)
-  modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&muted=1&playsinline=1&rel=0&modestbranding=1`;
-  // foco accesible en botón cerrar
+  // setear src SIN autoplay y sin muted
+  modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?controls=1&rel=0&modestbranding=1&playsinline=1`;
   try { modalClose.focus(); } catch(e){}
 }
 
+// cerrar modal: limpiar src para detener reproducción
 function closeModal(){
   modal.style.display = 'none';
-  // quitar src para detener reproducción y liberar recursos
   modalIframe.src = '';
 }
 
 // listeners
 modalClose.addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+// IMPORTANT: asegurarse que el iframe y sus padres permitan puntero
+// (por si hay CSS con pointer-events)
+const ensurePointer = () => {
+  const el = modal.querySelector('.ywp-modal-content');
+  if (el) el.style.pointerEvents = 'auto';
+  if (modalIframe) modalIframe.style.pointerEvents = 'auto';
+};
+ensurePointer();
+
 
 
     root.appendChild(shell);
