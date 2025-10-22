@@ -83,6 +83,21 @@ document.body.appendChild(modal);
 const modalIframe = modal.querySelector('.ywp-modal-iframe');
 const modalClose = modal.querySelector('.ywp-modal-close');
 
+// Asegurarnos de atributos necesarios para que los controles funcionen
+modalIframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
+modalIframe.setAttribute('allowfullscreen', '');   // presence is enough
+modalIframe.setAttribute('playsinline', '');       // ensures inline on iOS
+modalIframe.setAttribute('referrerpolicy', 'no-referrer');
+
+// Asegurar que el iframe reciba punteros (clics)
+modalIframe.style.pointerEvents = 'auto';
+const modalContent = modal.querySelector('.ywp-modal-content');
+if (modalContent) modalContent.style.pointerEvents = 'auto';
+
+// (opcional) forzar z-index para que iframe no quede debajo
+modal.style.zIndex = 9999;
+if (modalContent) modalContent.style.zIndex = 10000;
+
 // asegurar src vacío
 modalIframe.src = '';
 
@@ -138,15 +153,19 @@ ensurePointer();
       .ywp-live-btn{background:#e33;color:#fff;padding:8px 10px;border-radius:8px;border:0;cursor:pointer}
       @media(max-width:900px){ .ywp-grid{grid-template-columns:repeat(2,1fr)} }
       @media(max-width:560px){ .ywp-grid{grid-template-columns:repeat(1,1fr)} .ywp-search{min-width:140px} }
-      /* Modal — arreglar tamaño del iframe y botón cerrar */
-      .ywp-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);z-index:9999;padding: 20px; /* espacio alrededor para mobile */box-sizing: border-box;}
-      .ywp-modal-content{width:100%;max-width:1180px;background:#000;position:relative;border-radius:8px;overflow:hidden;/* usar relacion 16:9 pero permitir que el iframe llene completamente */aspect-ratio: 16 / 9;display:flex;}
-      .ywp-modal-iframe{border:0;width:100%;height:100%;display:block;}
-      .ywp-modal-close{position:absolute;top:10px;right:10px;background:rgba(255,255,255,0.95);color:#111;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;z-index: 2;font-weight:600;}
-      @media(max-width:760px){.ywp-modal-content{ width:100%; max-width:100%; border-radius:6px; }
-      .ywp-modal-close{ top:6px; right:6px; padding:5px 8px; }
+      /* Modal — tamaño, centrado y compatibilidad móvil */
+      .ywp-modal {position: fixed;inset: 0;display: none;align-items: center;justify-content: center;background: rgba(0, 0, 0, 0.75);z-index: 9999;padding: 20px; /* espacio alrededor para mobile */box-sizing: border-box;pointer-events: auto !important; /* aseguramos clics */}
+      /* Contenedor del modal */
+      .ywp-modal-content {width: 100%;max-width: 1180px;background: #000;position: relative;border-radius: 8px;overflow: hidden;aspect-ratio: 16 / 9;display: flex;pointer-events: auto !important;z-index: 10000;}
+      /* Iframe del video */
+      .ywp-modal-iframe {border: 0;width: 100%;height: 100%;display: block;pointer-events: auto !important; /* que reciba toques */z-index: 10000;}
+      /* Botón cerrar */
+      .ywp-modal-close {position: absolute;top: 10px;right: 10px;background: rgba(255, 255, 255, 0.95);color: #111;border: none;padding: 6px 10px;border-radius: 6px;cursor: pointer;z-index: 10001; /* sobre el iframe */font-weight: 600;}
+      /* Ajustes responsive */
+      @media (max-width: 760px) {
+      .ywp-modal-content {width: 100%;max-width: 100%;border-radius: 6px;}
+      .ywp-modal-close {top: 6px;right: 6px;padding: 5px 8px;}
       }
-
       `;
       document.head.appendChild(css);
     }
