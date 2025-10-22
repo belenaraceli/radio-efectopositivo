@@ -126,6 +126,14 @@ hr {
   height: auto;
 }
 
+.caja-vivo {
+  display: flex;
+  flex-wrap: nowrap;   
+  gap: 20px;  
+  align-items: center;
+  justify-content: flex-end; 
+}
+
 .vivo {
   display: flex;
   align-items: center;
@@ -141,6 +149,24 @@ hr {
   padding: 10px 8px 10px 16px;
   border: 1px solid white;
   border-radius: 20% / 50%;
+  text-shadow: 1px 1px 8px rgba(0,0,0,0.9);
+}
+
+.vivo-yt {
+  display: flex;
+  align-items: center;
+  justify-content: right;
+}
+
+.vivo-yt a {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: white;
+  text-decoration: none;
+  padding: 10px 8px 10px 16px;
+  border: 1px solid white;
+  border-radius: 25% / 50%;
   text-shadow: 1px 1px 8px rgba(0,0,0,0.9);
 }
 
@@ -559,6 +585,22 @@ hr {
   }
 
   .btn-vivo:hover {
+    background-color: red;
+    border-color: red;
+  }
+
+  .btn-vivo-yt {
+    color: white;
+    border: 1px solid white;
+    padding: 6px 12px;
+    border-radius: 30px;
+    text-decoration: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    background-color: transparent;
+  }
+
+  .btn-vivo-yt:hover {
     background-color: red;
     border-color: red;
   }
@@ -1109,7 +1151,7 @@ hr {
   .logo {
     width: 260px;
     height: 260px;
-    padding-right: 30px;
+    padding-left: 60px;
   }
 
   .rss a {
@@ -1123,6 +1165,12 @@ hr {
   }
 
   .vivo a {
+    font-size: 15px;
+    padding: 18px 15px 18px 33px;
+    cursor: pointer;
+  }
+
+   .vivo-yt a {
     font-size: 15px;
     padding: 18px 15px 18px 33px;
     cursor: pointer;
