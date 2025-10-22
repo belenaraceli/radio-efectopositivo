@@ -62,13 +62,45 @@
     pager.appendChild(prevBtn); pager.appendChild(pagesWrap); pager.appendChild(nextBtn);
     shell.appendChild(pager);
 
-    const modal = document.createElement('div'); modal.className='ywp-modal';
-    modal.innerHTML = `<div class="ywp-modal-content" role="dialog"><button class="ywp-modal-close">Cerrar ✖</button><iframe class="ywp-modal-iframe" src="" allowfullscreen></iframe></div>`;
-    document.body.appendChild(modal);
-    const modalIframe = modal.querySelector('.ywp-modal-iframe'); const modalClose = modal.querySelector('.ywp-modal-close');
-    function openModal(id){ modal.style.display='flex'; modalIframe.src = ''; modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0&modestbranding=1`; }
-    function closeModal(){ modal.style.display='none'; modalIframe.src=''; }
-    modalClose.addEventListener('click', closeModal); modal.addEventListener('click', (e)=>{ if(e.target===modal) closeModal(); });
+    // --- Modal: creación y control (reemplazar bloque existente) ---
+const modal = document.createElement('div');
+modal.className = 'ywp-modal';
+modal.innerHTML = `
+  <div class="ywp-modal-content" role="dialog">
+    <button class="ywp-modal-close" aria-label="Cerrar">Cerrar ✖</button>
+    <iframe class="ywp-modal-iframe" src="" frameborder="0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen playsinline></iframe>
+  </div>
+`;
+document.body.appendChild(modal);
+
+const modalIframe = modal.querySelector('.ywp-modal-iframe');
+const modalClose = modal.querySelector('.ywp-modal-close');
+
+// Asegurarse que el iframe no tenga src por defecto
+modalIframe.src = '';
+
+// openModal y closeModal robustos
+function openModal(id){
+  // esto debe ejecutarse como resultado del click del usuario
+  modal.style.display = 'flex';
+  // limpiar y luego setear src con autoplay silenciado y playsinline
+  modalIframe.src = '';
+  // builds src ensuring playsinline, muted (mejor compatibilidad movil)
+  modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&muted=1&playsinline=1&rel=0&modestbranding=1`;
+  // foco accesible en botón cerrar
+  try { modalClose.focus(); } catch(e){}
+}
+
+function closeModal(){
+  modal.style.display = 'none';
+  // quitar src para detener reproducción y liberar recursos
+  modalIframe.src = '';
+}
+
+// listeners
+modalClose.addEventListener('click', closeModal);
+modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
 
     root.appendChild(shell);
 
