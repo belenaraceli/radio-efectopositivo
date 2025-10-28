@@ -813,10 +813,10 @@ hr {
   flex-direction: column;
   align-items: center;
   gap: 30px;
-  padding: 30px 15px;
+  padding: 50px 80px;
   width: 100%;
   background-image: url("../assets/images/main2.png");
-  background-size: auto;
+  background-size: cover;
   background-color: #0C0C0C;
   color: white;
 }
@@ -833,30 +833,59 @@ hr {
   font-family: 'montserrat', sans-serif;
 }
 
+/* ---------- Galería: grid 5x2, centrado y responsive ---------- */
+.galeria-wrap {
+  max-width: 1200px;     /* ancho máximo de la galería */
+  margin: 0 auto;        /* centra la galería en la página */
+  padding: 12px;
+  box-sizing: border-box;
+}
+
 .galeria-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
-  padding: 10px;
-  max-width: 1200px;
+  display: grid;
+  gap: 16px;
+  justify-items: center; /* centra cada celda */
+  /* Desktop: 5 columnas (2 filas si hay 10 items visibles) */
+  grid-template-columns: repeat(4, 1fr);
 }
 
+/* Cada link ocupa todo el ancho de la celda */
+.galeria-grid a {
+  width: 100%;
+  display: block;
+}
+
+/* Imagen: mantiene proporción, recorta con object-fit */
 .galeria-grid img {
-  width: 300px;
-  height: 300px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;   /* miniaturas cuadradas */
   object-fit: cover;
-  transition: transform 0.3s ease;
+  display: block;
+  border-radius: 6px;
 }
 
-.galeria-grid img:hover {
-  transform: scale(1.05);
+/* ocultar por defecto los items marcados como ocultos */
+.hidden-img { display: none !important; }
+
+/* Responsive breakpoints: adaptar columnas */
+@media (max-width: 1150px) {
+  .galeria-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 900px) {
+  .galeria-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+  .galeria-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 380px) {
+  .galeria-grid { grid-template-columns: 1fr; }
 }
 
-.galeria-grid img {
-  border: none !important;
-  outline: none;
-}
+/* Ajustes estéticos (opcional) */
+.galeria-grid a { transition: transform .18s ease, box-shadow .18s ease; }
+.galeria-grid a:hover { transform: translateY(-4px); box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+
 
 .img-thumbnail {
   padding: 0 !important;
@@ -885,7 +914,7 @@ hr {
 
 #verMasBtn {
   background-color: rgba(31, 30, 30, 0.8);
-  color: rgb(184, 8, 8);
+  color: rgb(255, 255, 255);
   font-family: 'montserrat', sans-serif;
   font-size: 18px;
   padding: 15px 30px;
@@ -1086,6 +1115,10 @@ hr {
   }
 
   /* GALERÍA */
+  .main-galeria {
+    padding: 30px 25px;
+  }
+
   .main-galeria h1 {
     font-size: 24px;
   }
