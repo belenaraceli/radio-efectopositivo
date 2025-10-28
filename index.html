@@ -137,6 +137,68 @@
 
       <hr>
 
+      <!-- Carousel (copia este bloque entero donde quieras que aparezca) -->
+<section class="ce-carousel" aria-label="Galería destacada">
+  <div class="ce-carousel__viewport">
+    <div class="ce-carousel__track">
+      <!-- Slide 1: imagen -->
+      <div class="ce-slide" data-type="image" tabindex="0" aria-roledescription="slide" aria-label="Slide 1">
+        <img class="ce-media" loading="lazy" src="/assets/images/slide1.jpeg" alt="Descripción de la imagen 1">
+      </div>
+
+      <!-- Slide 2: imagen 
+      <div class="ce-slide" data-type="image" tabindex="0" aria-roledescription="slide" aria-label="Slide 2">
+        <img class="ce-media" loading="lazy" src="/assets/images/slide2.jpg" alt="Descripción de la imagen 2">
+      </div>-->
+
+      <!-- Slide 2: HTML5 video -->
+      <div class="ce-slide" data-type="video" tabindex="0" aria-roledescription="slide" aria-label="Slide 3: Vídeo">
+        <video class="ce-media" controls preload="metadata" poster="/assets/images/video-poster1.jpg">
+          <source src="/assets/videos/sample1.mp4" type="video/mp4">
+          Tu navegador no soporta video.
+        </video>
+      </div>
+
+      <!-- Slide 3: HTML5 video -->
+      <div class="ce-slide" data-type="video" tabindex="0" aria-roledescription="slide" aria-label="Slide 3: Vídeo">
+        <video class="ce-media" controls preload="metadata" poster="/assets/images/video-poster2.jpg">
+          <source src="/assets/videos/sample2.mp4" type="video/mp4">
+          Tu navegador no soporta video.
+        </video>
+      </div>
+
+      <!-- Slide 4: YouTube lazy embed (carga on demand al click) -->
+      <div class="ce-slide" data-type="youtube" data-youtube-id="OcmWak5eS2c" tabindex="0" aria-roledescription="slide" aria-label="Slide 4: YouTube">
+        <!-- poster image + play overlay; el iframe se inyecta al click -->
+        <div class="ce-youtube-poster" role="button" tabindex="0" aria-label="Reproducir video de YouTube">
+          <img class="ce-media" loading="lazy" src="/assets/images/yt-poster1.jpg" alt="Miniatura YouTube">
+          <span class="ce-playbtn" aria-hidden="true">▶</span>
+        </div>
+      </div>
+
+      <!-- Slide 5: YouTube lazy embed (carga on demand al click) -->
+      <div class="ce-slide" data-type="youtube" data-youtube-id="SCnYtID_9XE" tabindex="0" aria-roledescription="slide" aria-label="Slide 4: YouTube">
+        <!-- poster image + play overlay; el iframe se inyecta al click -->
+        <div class="ce-youtube-poster" role="button" tabindex="0" aria-label="Reproducir video de YouTube">
+          <img class="ce-media" loading="lazy" src="/assets/images/yt-poster2.jpg" alt="Miniatura YouTube">
+          <span class="ce-playbtn" aria-hidden="true">▶</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controles -->
+  <button class="ce-btn ce-btn--prev" aria-label="Anterior">&larr;</button>
+  <button class="ce-btn ce-btn--next" aria-label="Siguiente">&rarr;</button>
+
+  <!-- Indicadores (puntos) -->
+  <div class="ce-dots" role="tablist" aria-label="Navegación de slides"></div>
+
+</section>
+
+<hr>
+
+
       <div class="descarga">
         <img src="assets/videos/app2.gif" class="appdesk" />
         <img src="assets/videos/app2.gif" class="appmob" />
@@ -203,5 +265,6 @@
   <script src="js/radio.js"></script>
   <script src="js/vivoyt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/carousel.js"></script>
 </body>
 </html>

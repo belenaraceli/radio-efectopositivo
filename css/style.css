@@ -289,6 +289,153 @@ hr {
   padding-left: 100%;
 }
 
+:root{
+  --ce-width: 100%;
+  --ce-max-width: 1200px;
+  --ce-gap: 12px;
+  --ce-btn-size: 44px;
+  --ce-bg: #000;
+  --ce-accent: #ffffff;
+}
+
+/* Contenedor */
+.ce-carousel {
+  width: var(--ce-width);
+  max-width: var(--ce-max-width);
+  margin: 20px auto;
+  position: relative;
+  box-sizing: border-box;
+  padding: 8px;
+  --safe-bottom: 12px;
+}
+
+/* viewport (oculta overflow) */
+.ce-carousel__viewport{
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+/* track: fila horizontal de slides */
+.ce-carousel__track{
+  display: flex;
+  gap: var(--ce-gap);
+  transition: transform .45s cubic-bezier(.22,.9,.2,1);
+  will-change: transform;
+}
+
+/* cada slide */
+.ce-slide{
+  min-width: 100%;
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  position: relative;
+  display:flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  color: #fff;
+  overflow: hidden;
+  outline: none;
+}
+
+/* media dentro del slide (img/video/iframe wrapper) */
+.ce-media{
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: cover;
+  display:block;
+}
+
+/* YouTube poster wrapper */
+.ce-youtube-poster{
+  position: relative;
+  width:100%;
+  cursor: pointer;
+}
+.ce-youtube-poster img.ce-media{ display:block; width:100%; height:auto; }
+.ce-playbtn{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  background: rgba(0,0,0,0.55);
+  color:var(--ce-accent);
+  width:68px;
+  height:68px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:28px;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+}
+
+/* Controls prev/next */
+.ce-btn{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  width:var(--ce-btn-size);
+  height:var(--ce-btn-size);
+  border-radius:50%;
+  border:none;
+  background: rgba(0,0,0,0.5);
+  color: var(--ce-accent);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  z-index: 40;
+}
+.ce-btn:focus{ outline: 3px solid rgba(255,255,255,.16); }
+.ce-btn--prev{ left:12px; }
+.ce-btn--next{ right:12px; }
+.ce-btn:hover{ background: rgba(0,0,0,0.8); }
+
+/* Dots */
+.ce-dots{
+  display:flex;
+  gap:8px;
+  justify-content:center;
+  margin-top:10px;
+}
+.ce-dot{
+  width:10px; height:10px; border-radius:50%;
+  background: rgba(255,255,255,.4);
+  cursor:pointer;
+}
+.ce-dot[aria-pressed="true"]{
+  background: var(--ce-accent);
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+}
+
+/* autoplay toggle */
+.ce-autoplay-toggle{
+  position:absolute;
+  bottom:var(--safe-bottom);
+  right:12px;
+  background: rgba(0,0,0,0.6);
+  color:var(--ce-accent);
+  border:none;
+  padding:8px 10px;
+  border-radius:6px;
+  z-index:40;
+}
+
+/* Responsive: show partial next slide on large screens */
+@media(min-width: 900px){
+  .ce-slide{ min-width: 80%; flex-basis: 80%; }
+  .ce-carousel__track{ padding-left: 8%; } /* center-ish */
+}
+@media(min-width: 1200px){
+  .ce-slide{ min-width: 60%; flex-basis: 60%; }
+  .ce-carousel__track{ padding-left: 20%; } 
+}
+
+/* make touch gestures natural */
+.ce-carousel__viewport { touch-action: pan-y; }
+
 .escuchanos {
   display: flex;
   flex-direction: column;
