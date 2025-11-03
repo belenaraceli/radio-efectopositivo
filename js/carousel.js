@@ -11,7 +11,7 @@
   const nextBtn = root.querySelector('.ce-btn--next');
   const dotsWrap = root.querySelector('.ce-dots');
   const autoplayBtn = root.querySelector('.ce-autoplay-toggle');
-  const AUTOPLAY_INTERVAL = 5000;
+  const AUTOPLAY_INTERVAL = 3000;
 
   let idx = 0;
   let autoplay = true;
@@ -124,3 +124,15 @@
   // adapt on resize to recalc widths
   window.addEventListener('resize', ()=> { update(); });
 })();
+
+// init Plyr para todos los videos con clase .js-plyr
+document.addEventListener('DOMContentLoaded', () => {
+  const players = Array.from(document.querySelectorAll('.js-plyr')).map(v => new Plyr(v, {
+    controls: ['play-large','play','progress','current-time','mute','volume','settings','fullscreen'],
+    ratio: '16:9',
+    invertTime: false
+  }));
+  // opcional: guardar players globalmente si necesitas controlarlos
+  window._plyr = players;
+});
+

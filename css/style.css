@@ -1179,6 +1179,36 @@ hr {
 /* ========================================== */
 
 @media screen and (max-width: 990px) {
+
+  .ce-carousel {
+    max-height: 350px;          /* reduce la altura general */
+    overflow: hidden;
+  }
+
+  .ce-carousel__track .ce-slide img,
+  .ce-carousel__track .ce-slide video {
+    height: 350px;              /* imágenes/videos más chicos */
+    object-fit: cover;
+  }
+
+  .ce-carousel .ce-arrow {
+    width: 36px;                /* flechas un poco más pequeñas */
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .ce-dots {
+    transform: scale(.85);      /* puntos más discretos */
+    margin-top: 4px;
+  }
+
+  .plyr .plyr__controls { background: rgba(0,0,0,0.45); }
+.plyr--full-ui .plyr__control { color: #fff; }
+
+
+
+
+
   /* PROGRAMACIÓN */
 
   .main-programacion {
@@ -1287,7 +1317,7 @@ hr {
 
   #verMasBtn {
     background-color: rgba(31, 30, 30, 0.8);
-    color: rgb(184, 8, 8);
+    color: rgb(255, 255, 255);
     font-family: 'montserrat', sans-serif;
     font-size: 18px;
     padding: 15px 30px;
