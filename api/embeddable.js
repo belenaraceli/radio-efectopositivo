@@ -1,85 +1,93 @@
 // api/embeddable.js  (CommonJS, listo para Vercel)
 const BASE = 'https://www.googleapis.com/youtube/v3';
 
-function okJson(res, data){ res.setHeader('Content-Type','application/json'); res.status(200).send(JSON.stringify(data)); }
-function err(res, msg, code=500){ res.status(code).send({ error: msg }); }
-
-async function fetchJson(url){
+async function fetchJson(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`YT API ${r.status} ${r.statusText}`);
   return r.json();
 }
 
-// search.list -> obtener ids de videos de un channel (una página)
-async function searchListVideoIds(apiKey, channelId, pageToken){
-  const q = new URL(`${BASE}/search`);
-  q.searchParams.set('key', apiKey);
-  q.searchParams.set('part', 'id');
-  q.searchParams.set('channelId', channelId);
-  q.searchParams.set('type', 'video');
-  q.searchParams.set('maxResults', '50');
-  if (pageToken) q.searchParams.set('pageToken', pageToken);
-  const j = await fetchJson(q.toString());
-  const ids = (j.items||[]).map(it => it.id && it.id.videoId).filter(Boolean);
-  return { ids, nextPageToken: j.nextPageToken || null };
-}
-
-// videos.list -> obtener status.embeddable para hasta 50 ids
-async function videosListStatus(apiKey, ids){
-  if (!ids || ids.length===0) return [];
-  const q = new URL(`${BASE}/videos`);
-  q.searchParams.set('key', apiKey);
-  q.searchParams.set('part', 'status,snippet');
-  q.searchParams.set('id', ids.join(','));
-  const j = await fetchJson(q.toString());
-  return (j.items||[]).map(it => ({
-    id: it.id,
-    title: it.snippet?.title || '',
-    embeddable: !!(it.status && it.status.embeddable)
-  }));
-}
-
 module.exports = async (req, res) => {
   try {
-    const apiKey = process.env.YOUTUBE_API_KEY;
-    if (!apiKey) return err(res, 'YOUTUBE_API_KEY no configurada', 500);
+    const apiKey = process.env.YOUTUBE_API_KEY || process.env.YT_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'YOUTUBE_API_KEY no configurada' });
 
-    const { videoId, channelId, pageToken } = Object.assign({}, req.query || {}, req.body || {});
+    const { videoId, channelId } = req.query || {};
+    if (!videoId && !channelId) return res.status(400).json({ error: 'Pasa ?videoId=... o ?channelId=...' });
 
-    // 1) consulta por videoId
+    // Si piden videoId -> detalles completos (diagnóstico)
     if (videoId) {
-      const rows = await videosListStatus(apiKey, [videoId]);
-      if (rows.length === 0) return okJson(res, { videoId, embeddable: false, note: 'video not found' });
-      return okJson(res, rows[0]);
+      const q = new URL(`${BASE}/videos`);
+      q.searchParams.set('key', apiKey);
+      q.searchParams.set('part', 'status,contentDetails,snippet');
+      q.searchParams.set('id', videoId);
+      const j = await fetchJson(q.toString());
+      if (!j.items || j.items.length === 0) return res.status(404).json({ id: videoId, found: false });
+      const it = j.items[0];
+      const out = {
+        id: it.id,
+        title: it.snippet?.title || '',
+        embeddable: !!(it.status && it.status.embeddable),
+        privacyStatus: it.status?.privacyStatus || null,
+        uploadStatus: it.status?.uploadStatus || null,
+        rejectionReason: it.status?.rejectionReason || null,
+        contentRating: it.contentDetails?.contentRating || null,
+        regionRestriction: it.contentDetails?.regionRestriction || null,
+        snippet: {
+          channelTitle: it.snippet?.channelTitle || '',
+          publishedAt: it.snippet?.publishedAt || null,
+        }
+      };
+      return res.setHeader('Content-Type','application/json').status(200).send(JSON.stringify(out));
     }
 
-    // 2) consulta por channelId: recorrer páginas hasta 200 videos por defecto (evitar loops infinitos)
+    // Si piden channelId -> listar embeddability de varios videos (comportamiento similar al anterior embeddable.js)
     if (channelId) {
-      let allIds = [];
-      let token = pageToken || null;
+      // simple delegación al endpoint original: search.list + videos.list batching
+      const MAX_PAGES = 5; // 5*50 = 250 videos max
+      const ids = [];
+      let pageToken = null;
       let pages = 0;
-      while (pages < 5) { // 5 pages * 50 = 250 videos max per request
-        const out = await searchListVideoIds(apiKey, channelId, token);
-        allIds = allIds.concat(out.ids);
-        token = out.nextPageToken;
+      while (pages < MAX_PAGES) {
+        const s = new URL(`${BASE}/search`);
+        s.searchParams.set('key', apiKey);
+        s.searchParams.set('part', 'id');
+        s.searchParams.set('channelId', channelId);
+        s.searchParams.set('type', 'video');
+        s.searchParams.set('maxResults', '50');
+        if (pageToken) s.searchParams.set('pageToken', pageToken);
+        const sj = await fetchJson(s.toString());
+        (sj.items || []).forEach(it => {
+          const vid = it.id && it.id.videoId;
+          if (vid) ids.push(vid);
+        });
+        pageToken = sj.nextPageToken || null;
         pages++;
-        if (!token) break;
+        if (!pageToken) break;
       }
-      // batch en bloques de 50
-      const chunks = [];
-      for (let i=0;i<allIds.length;i+=50) chunks.push(allIds.slice(i,i+50));
-      const results = [];
-      for (const c of chunks) {
-        const r = await videosListStatus(apiKey, c);
-        results.push(...r);
+      // batch videos.list
+      const out = [];
+      for (let i=0;i<ids.length;i+=50) {
+        const chunk = ids.slice(i,i+50);
+        const v = new URL(`${BASE}/videos`);
+        v.searchParams.set('key', apiKey);
+        v.searchParams.set('part', 'status,snippet');
+        v.searchParams.set('id', chunk.join(','));
+        const vj = await fetchJson(v.toString());
+        (vj.items || []).forEach(it => {
+          out.push({
+            id: it.id,
+            title: it.snippet?.title || '',
+            embeddable: !!(it.status && it.status.embeddable)
+          });
+        });
       }
-      return okJson(res, { channelId, videos: results, total: results.length });
+      return res.setHeader('Content-Type','application/json').status(200).send(JSON.stringify({ channelId, total: out.length, videos: out }));
     }
 
-    // 3) si no se pasaron parámetros
-    return err(res, 'Pasa ?videoId=... o ?channelId=...', 400);
-  } catch (e) {
-    console.error('api/embeddable error', e);
-    return err(res, e.message || 'internal');
+    return res.status(400).json({ error: 'Parámetros inválidos' });
+  } catch (err) {
+    console.error('api/embeddable error', err);
+    return res.status(500).json({ error: err.message || 'internal' });
   }
 };

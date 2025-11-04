@@ -1,10 +1,6 @@
 /* js/widget.js
-   Versión corregida: control robusto de peticiones para evitar apilamiento
-   - No hay opción asc/desc
-   - Tabs basados en ALLOWED_PLAYLISTS (rellena con tus playlist IDs)
-   - Paginación por páginas (pageSize configurable)
-   - AbortController por petición y validación requestId antes de render
-   - Fallback RSS si la API devuelve quotaExceeded
+   Versión integrada: tryOpenVideo + fallback + modal seguro
+   Reemplaza el widget.js anterior por este
 */
 
 (function(){
@@ -62,73 +58,68 @@
     pager.appendChild(prevBtn); pager.appendChild(pagesWrap); pager.appendChild(nextBtn);
     shell.appendChild(pager);
 
-// --- Modal: creación y control (sin autoplay; controles nativos habilitados) ---
-const modal = document.createElement('div');
-modal.className = 'ywp-modal';
-modal.innerHTML = `
-  <div class="ywp-modal-content" role="dialog">
-    <button class="ywp-modal-close" aria-label="Cerrar">Cerrar ✖</button>
-    <iframe class="ywp-modal-iframe"
-      src=""
-      frameborder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-      allowfullscreen
-      playsinline
-      referrerpolicy="no-referrer"
-    ></iframe>
-  </div>
-`;
-document.body.appendChild(modal);
+    // --- Modal: creación y control (sin autoplay; controles nativos habilitados) ---
+    const modal = document.createElement('div');
+    modal.className = 'ywp-modal';
+    modal.innerHTML = `
+      <div class="ywp-modal-content" role="dialog">
+        <button class="ywp-modal-close" aria-label="Cerrar">Cerrar ✖</button>
+        <iframe class="ywp-modal-iframe"
+          src=""
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowfullscreen
+          playsinline
+        ></iframe>
+      </div>
+    `;
+    document.body.appendChild(modal);
 
-const modalIframe = modal.querySelector('.ywp-modal-iframe');
-const modalClose = modal.querySelector('.ywp-modal-close');
+    const modalIframe = modal.querySelector('.ywp-modal-iframe');
+    const modalClose = modal.querySelector('.ywp-modal-close');
 
-// Asegurarnos de atributos necesarios para que los controles funcionen
-modalIframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
-modalIframe.setAttribute('allowfullscreen', '');   // presence is enough
-modalIframe.setAttribute('playsinline', '');       // ensures inline on iOS
-modalIframe.setAttribute('referrerpolicy', 'no-referrer');
+    // Asegurarnos de atributos necesarios para que los controles funcionen
+    modalIframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
+    modalIframe.setAttribute('allowfullscreen', '');   // presence is enough
+    modalIframe.setAttribute('playsinline', '');       // ensures inline on iOS');
+    // inicialmente no ponemos referrerpolicy (lo quitamos por defecto)
 
-// Asegurar que el iframe reciba punteros (clics)
-modalIframe.style.pointerEvents = 'auto';
-const modalContent = modal.querySelector('.ywp-modal-content');
-if (modalContent) modalContent.style.pointerEvents = 'auto';
+    // Asegurar que el iframe reciba punteros (clics)
+    modalIframe.style.pointerEvents = 'auto';
+    const modalContent = modal.querySelector('.ywp-modal-content');
+    if (modalContent) modalContent.style.pointerEvents = 'auto';
 
-// (opcional) forzar z-index para que iframe no quede debajo
-modal.style.zIndex = 9999;
-if (modalContent) modalContent.style.zIndex = 10000;
+    // (opcional) forzar z-index para que iframe no quede debajo
+    modal.style.zIndex = 9999;
+    if (modalContent) modalContent.style.zIndex = 10000;
 
-// asegurar src vacío
-modalIframe.src = '';
+    // asegurar src vacío
+    modalIframe.src = '';
 
-// abrir modal SIN autoplay: el usuario usará los controles para play/pause
-function openModal(id){
-  modal.style.display = 'flex';
-  // setear src SIN autoplay y sin muted
-  modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?controls=1&rel=0&modestbranding=1&playsinline=1`;
-  try { modalClose.focus(); } catch(e){}
-}
+    // abrir modal SIN autoplay: el usuario usará los controles para play/pause
+    function openModal(id){
+      modal.style.display = 'flex';
+      // setear src SIN autoplay y sin muted
+      modalIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?controls=1&rel=0&modestbranding=1&playsinline=1`;
+      try { modalClose.focus(); } catch(e){}
+    }
 
-// cerrar modal: limpiar src para detener reproducción
-function closeModal(){
-  modal.style.display = 'none';
-  modalIframe.src = '';
-}
+    // cerrar modal: limpiar src para detener reproducción
+    function closeModal(){
+      modal.style.display = 'none';
+      modalIframe.src = '';
+    }
 
-// listeners
-modalClose.addEventListener('click', closeModal);
-modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    // listeners
+    modalClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
-// IMPORTANT: asegurarse que el iframe y sus padres permitan puntero
-// (por si hay CSS con pointer-events)
-const ensurePointer = () => {
-  const el = modal.querySelector('.ywp-modal-content');
-  if (el) el.style.pointerEvents = 'auto';
-  if (modalIframe) modalIframe.style.pointerEvents = 'auto';
-};
-ensurePointer();
-
-
+    const ensurePointer = () => {
+      const el = modal.querySelector('.ywp-modal-content');
+      if (el) el.style.pointerEvents = 'auto';
+      if (modalIframe) modalIframe.style.pointerEvents = 'auto';
+    };
+    ensurePointer();
 
     root.appendChild(shell);
 
@@ -228,7 +219,8 @@ ensurePointer();
         const title = document.createElement('div'); title.className='yt-video-title'; title.textContent = v.title || 'Sin título';
         card.appendChild(thumb); card.appendChild(title);
         card.dataset.published = v.publishedAt || '';
-        card.addEventListener('click', ()=> openModal(v.id));
+        // CLICK ahora va a tryOpenVideo (no abrir directamente el modal)
+        card.addEventListener('click', ()=> tryOpenVideo(v.id));
         grid.appendChild(card);
       });
     }
@@ -383,7 +375,7 @@ ensurePointer();
       if (show) {
         liveBtn.style.display = 'inline-flex';
         liveBtn.textContent = 'En vivo ▶';
-        liveBtn.onclick = ()=> openModal(videoId);
+        liveBtn.onclick = ()=> tryOpenVideo(videoId);
       } else {
         liveBtn.style.display = 'none';
         liveBtn.onclick = null;
@@ -435,6 +427,68 @@ ensurePointer();
         grid.innerHTML = `<div style="color:#f88">Error en búsqueda.</div>`;
       }
     });
+
+    // === NUEVAS FUNCIONES: tryOpenVideo (usa api/embeddable) y openModalWithFallback ===
+
+    // tryOpenVideo: consulta /api/embeddable?videoId=... y decide
+    async function tryOpenVideo(videoId) {
+      if (!videoId) return;
+      try {
+        const r = await fetch(`/api/embeddable?videoId=${encodeURIComponent(videoId)}`);
+        if (!r.ok) throw new Error('embeddable endpoint error');
+        const info = await r.json();
+        console.log('embeddable info', info);
+
+        if (!info || info.embeddable === false) {
+          // no embeddable -> abrir watch
+          window.open(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, '_blank', 'noopener');
+          return;
+        }
+
+        // embeddable true -> intentar embeber con fallback
+        openModalWithFallback(videoId);
+      } catch (err) {
+        console.error('tryOpenVideo error', err);
+        window.open(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, '_blank', 'noopener');
+      }
+    }
+
+    // openModalWithFallback: inserta iframe limpiando referrerpolicy y con timer de fallback
+    function openModalWithFallback(id) {
+      const iframe = modal.querySelector('.ywp-modal-iframe');
+      if (!iframe) {
+        window.open(`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`, '_blank', 'noopener');
+        return;
+      }
+
+      // remove problematic attr and ensure needed ones
+      try { iframe.removeAttribute('referrerpolicy'); } catch(e){}
+      iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
+      iframe.setAttribute('allowfullscreen','');
+      iframe.setAttribute('playsinline','');
+
+      // URL simple para evitar parámetros problemáticos
+      const srcSimple = `https://www.youtube.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1`;
+
+      // show modal and set src
+      modal.style.display = 'flex';
+      iframe.src = '';
+      setTimeout(()=> { iframe.src = srcSimple; console.log('iframe.src set to', iframe.src); }, 60);
+
+      // fallback: si no carga bien en ~3.5s abrir watch?v=
+      const fallback = setTimeout(()=> {
+        console.warn('Iframe did not load properly — fallback to watch page for', id);
+        try { modal.style.display = 'none'; } catch(e){}
+        try { iframe.removeAttribute('src'); } catch(e){}
+        window.open(`https://www.youtube.com/watch?v=${encodeURIComponent(id)}`, '_blank', 'noopener');
+      }, 3500);
+
+      // cancelar fallback si evento load se dispara
+      iframe.addEventListener('load', ()=> {
+        clearTimeout(fallback);
+        console.log('Iframe load event fired for', id);
+      }, { once: true });
+    }
 
     // init
     await initTabs();
