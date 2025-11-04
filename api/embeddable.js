@@ -1,4 +1,5 @@
 // api/embeddable.js  (CommonJS, listo para Vercel)
+// Añade cabeceras de cache para ahorrar cuota y limpia logs innecesarios
 const BASE = 'https://www.googleapis.com/youtube/v3';
 
 async function fetchJson(url) {
@@ -14,6 +15,10 @@ module.exports = async (req, res) => {
 
     const { videoId, channelId } = req.query || {};
     if (!videoId && !channelId) return res.status(400).json({ error: 'Pasa ?videoId=... o ?channelId=...' });
+
+    // Cache-Control header (Vercel respects s-maxage for edge cache)
+    // s-maxage: 86400s = 1 día; stale-while-revalidate: 3600s
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600');
 
     // Si piden videoId -> detalles completos (diagnóstico)
     if (videoId) {
@@ -38,12 +43,11 @@ module.exports = async (req, res) => {
           publishedAt: it.snippet?.publishedAt || null,
         }
       };
-      return res.setHeader('Content-Type','application/json').status(200).send(JSON.stringify(out));
+      return res.status(200).json(out);
     }
 
-    // Si piden channelId -> listar embeddability de varios videos (comportamiento similar al anterior embeddable.js)
+    // Si piden channelId -> listar embeddability de varios videos (batch)
     if (channelId) {
-      // simple delegación al endpoint original: search.list + videos.list batching
       const MAX_PAGES = 5; // 5*50 = 250 videos max
       const ids = [];
       let pageToken = null;
@@ -82,12 +86,11 @@ module.exports = async (req, res) => {
           });
         });
       }
-      return res.setHeader('Content-Type','application/json').status(200).send(JSON.stringify({ channelId, total: out.length, videos: out }));
+      return res.status(200).json({ channelId, total: out.length, videos: out });
     }
 
     return res.status(400).json({ error: 'Parámetros inválidos' });
   } catch (err) {
-    console.error('api/embeddable error', err);
     return res.status(500).json({ error: err.message || 'internal' });
   }
 };
